@@ -69,18 +69,19 @@ const DataSettings = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 z-[100] overflow-y-auto"
             onClick={() => setIsOpen(false)}
           >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className={`rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto ${
-                isDarkMode ? 'bg-[#0d0f1a] border border-purple-500/30' : 'bg-white'
-              }`}
-              onClick={e => e.stopPropagation()}
-            >
+            <div className="min-h-full flex items-center justify-center p-4">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className={`rounded-2xl max-w-lg w-full shadow-2xl my-8 ${
+                  isDarkMode ? 'bg-[#0d0f1a] border border-purple-500/30' : 'bg-white'
+                }`}
+                onClick={e => e.stopPropagation()}
+              >
               {/* Header */}
               <div className={`flex items-center justify-between p-6 border-b ${
                 isDarkMode ? 'border-purple-500/20' : 'border-gray-200'
@@ -227,6 +228,7 @@ const DataSettings = () => {
                 </div>
               </div>
             </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
