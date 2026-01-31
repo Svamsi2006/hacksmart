@@ -6,11 +6,12 @@ import Badge from '../shared/Badge';
 import Button from '../shared/Button';
 import BarChart from '../charts/BarChart';
 import { useData } from '../../context/DataContext';
+import { useTheme } from '../../context/ThemeContext';
 import { sopChecklist, escalationMatrix } from '../../data/sopData';
 import { calculateRealKPIs, generateIssueSummary, formatIndianCurrency } from '../../services/analyticsService';
 
 // Helper function to get direct audio URL from Google Drive
-const getDirectAudioUrl = (driveUrl) => {
+const getDirectAudioUrl = (driveUrl) => {       
   if (!driveUrl) return null;
   const patterns = [
     /\/file\/d\/([a-zA-Z0-9_-]+)/,
@@ -28,6 +29,7 @@ const getDirectAudioUrl = (driveUrl) => {
 
 const RevenueLeakage = () => {
   const { calls } = useData();
+  const { isDarkMode } = useTheme();
   const [selectedCall, setSelectedCall] = useState(null);
   
   // Audio player state
@@ -217,44 +219,44 @@ const RevenueLeakage = () => {
     >
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-navy">Revenue Leakage Radar</h2>
-        <p className="text-sm text-gray-600 mt-1">Identifying and preventing revenue loss opportunities</p>
+        <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-navy'}`}>Revenue Leakage Radar</h2>
+        <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Identifying and preventing revenue loss opportunities</p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 bg-gradient-to-br from-danger/10 to-danger/5 border-danger/20">
+        <Card className={`p-6 ${isDarkMode ? 'bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20' : 'bg-gradient-to-br from-danger/10 to-danger/5 border-danger/20'}`}>
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-danger/20 rounded-xl">
+            <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-red-500/20' : 'bg-danger/20'}`}>
               <TrendingDown className="w-6 h-6 text-danger" />
             </div>
-            <span className="text-sm font-semibold text-gray-600">Total Leakage</span>
+            <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Total Leakage</span>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">{formatIndianCurrency(leakageData.total)}</p>
-          <p className="text-xs text-gray-600">Detected from {calls.length} calls analyzed</p>
-          <p className="text-xs text-gray-500 mt-1">High: ₹{leakageData.highRiskLeakage?.toLocaleString()} | Med: ₹{leakageData.mediumRiskLeakage?.toLocaleString()}</p>
+          <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-navy'}`}>{formatIndianCurrency(leakageData.total)}</p>
+          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Detected from {calls.length} calls analyzed</p>
+          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>High: ₹{leakageData.highRiskLeakage?.toLocaleString()} | Med: ₹{leakageData.mediumRiskLeakage?.toLocaleString()}</p>
         </Card>
 
-        <Card className="p-6 bg-gradient-to-br from-amber/10 to-amber/5 border-amber/20">
+        <Card className={`p-6 ${isDarkMode ? 'bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20' : 'bg-gradient-to-br from-amber/10 to-amber/5 border-amber/20'}`}>
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-amber/20 rounded-xl">
+            <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-amber-500/20' : 'bg-amber/20'}`}>
               <AlertTriangle className="w-6 h-6 text-amber" />
             </div>
-            <span className="text-sm font-semibold text-gray-600">High-Risk Leakage</span>
+            <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>High-Risk Leakage</span>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">{formatIndianCurrency(leakageData.highRiskLeakage || 0)}</p>
-          <p className="text-xs text-gray-600">{realKPIs.highRiskCalls} high-risk calls × ₹1,500</p>
+          <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-navy'}`}>{formatIndianCurrency(leakageData.highRiskLeakage || 0)}</p>
+          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{realKPIs.highRiskCalls} high-risk calls × ₹1,500</p>
         </Card>
 
-        <Card className="p-6 bg-gradient-to-br from-teal/10 to-teal/5 border-teal/20">
+        <Card className={`p-6 ${isDarkMode ? 'bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20' : 'bg-gradient-to-br from-teal/10 to-teal/5 border-teal/20'}`}>
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-teal/20 rounded-xl">
-              <AlertCircle className="w-6 h-6 text-teal" />
+            <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-cyan-500/20' : 'bg-teal/20'}`}>
+              <AlertCircle className={`w-6 h-6 ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`} />
             </div>
-            <span className="text-sm font-semibold text-gray-600">Cases Identified</span>
+            <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Cases Identified</span>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">{realKPIs.highRiskCalls + realKPIs.mediumRiskCalls}</p>
-          <p className="text-xs text-gray-600">{realKPIs.highRiskCalls} high + {realKPIs.mediumRiskCalls} medium risk</p>
+          <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-navy'}`}>{realKPIs.highRiskCalls + realKPIs.mediumRiskCalls}</p>
+          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{realKPIs.highRiskCalls} high + {realKPIs.mediumRiskCalls} medium risk</p>
         </Card>
       </div>
 
@@ -262,7 +264,7 @@ const RevenueLeakage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* City-wise Leakage */}
         <Card className="p-6">
-          <h3 className="text-lg font-bold text-navy mb-6">Revenue Leakage by City</h3>
+          <h3 className={`text-lg font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-navy'}`}>Revenue Leakage by City</h3>
           <BarChart
             data={cityBreakdown()}
             xKey="city"
@@ -272,7 +274,7 @@ const RevenueLeakage = () => {
 
         {/* Category Breakdown */}
         <Card className="p-6">
-          <h3 className="text-lg font-bold text-navy mb-6">Leakage Categories</h3>
+          <h3 className={`text-lg font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-navy'}`}>Leakage Categories</h3>
           <div className="space-y-4">
             {leakageData.categories.map((category, index) => (
               <motion.div
@@ -280,19 +282,19 @@ const RevenueLeakage = () => {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="p-4 bg-gray-50 rounded-lg"
+                className={`p-4 rounded-lg ${isDarkMode ? 'bg-purple-900/20' : 'bg-gray-50'}`}
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold text-navy">{category.type}</span>
+                  <span className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-navy'}`}>{category.type}</span>
                   <span className="text-lg font-bold text-danger">{formatCurrency(category.amount)}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-purple-900/50' : 'bg-gray-200'}`}>
                   <div
                     className="h-2 rounded-full bg-danger"
                     style={{ width: `${category.percentage}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">{category.description}</p>
+                <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{category.description}</p>
               </motion.div>
             ))}
           </div>
@@ -301,22 +303,22 @@ const RevenueLeakage = () => {
 
       {/* SOP Reference - Compensation Limits */}
       <Card className="p-6">
-        <h3 className="text-lg font-bold text-navy mb-4">SOP Compensation Limits (Reference)</h3>
-        <p className="text-xs text-gray-500 mb-4">Per BS-SOP-001-R2 & BS-SOP-002-R2 - Unauthorized compensation causes revenue leakage</p>
+        <h3 className={`text-lg font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-navy'}`}>SOP Compensation Limits (Reference)</h3>
+        <p className={`text-xs mb-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Per BS-SOP-001-R2 & BS-SOP-002-R2 - Unauthorized compensation causes revenue leakage</p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className={isDarkMode ? 'bg-purple-900/30' : 'bg-gray-50'}>
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Scenario</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Max Compensation</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Authority</th>
+                <th className={`px-4 py-3 text-left font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Scenario</th>
+                <th className={`px-4 py-3 text-left font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Max Compensation</th>
+                <th className={`px-4 py-3 text-left font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Authority</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className={`divide-y ${isDarkMode ? 'divide-purple-500/20' : 'divide-gray-200'}`}>
               {sopChecklist.swapStation.steps[3].approvalLimits.map((limit, idx) => (
-                <tr key={idx} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-700">{limit.scenario}</td>
-                  <td className="px-4 py-3 font-medium text-navy">{limit.compensation}</td>
+                <tr key={idx} className={isDarkMode ? 'hover:bg-purple-900/20' : 'hover:bg-gray-50'}>
+                  <td className={`px-4 py-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{limit.scenario}</td>
+                  <td className={`px-4 py-3 font-medium ${isDarkMode ? 'text-white' : 'text-navy'}`}>{limit.compensation}</td>
                   <td className="px-4 py-3">
                     <Badge variant={limit.authority.includes('L1') ? 'low' : limit.authority.includes('L2') ? 'medium' : 'high'}>
                       {limit.authority}

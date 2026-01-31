@@ -6,6 +6,7 @@ import NotificationCenter from '../shared/NotificationCenter';
 import DarkModeToggle from '../shared/DarkModeToggle';
 import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
+import logoImage from '../../assets/batterysmart_logo.jpg';
 
 const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
   const { selectedCity, setSelectedCity, selectedDateRange, setSelectedDateRange } = useData();
@@ -35,25 +36,15 @@ const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
           {/* Logo */}
           <div className="flex items-center gap-2 md:gap-3">
             <motion.div 
-              className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-teal to-navy rounded-xl flex items-center justify-center"
+              className="w-8 h-8 md:w-10 md:h-10 rounded-xl overflow-hidden"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              {/* Battery Smart Logo */}
-              <svg viewBox="0 0 100 100" className="w-5 h-5 md:w-6 md:h-6">
-                <defs>
-                  <linearGradient id="navLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#00E676" />
-                    <stop offset="100%" stopColor="#00C853" />
-                  </linearGradient>
-                </defs>
-                <rect x="35" y="5" width="30" height="8" rx="3" fill="url(#navLogoGradient)"/>
-                <path d="M25 18 L75 18 L75 25 L55 50 L75 75 L75 82 L25 82 L25 75 L45 50 L25 25 Z" fill="url(#navLogoGradient)"/>
-              </svg>
+              <img src={logoImage} alt="Battery Smart" className="w-full h-full object-cover" />
             </motion.div>
             <div className="hidden sm:block">
               <h1 className={`text-lg md:text-xl font-bold ${isDarkMode ? 'text-white' : 'text-navy'}`}>Smart-Audit AI</h1>
-              <p className={`text-[10px] md:text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Battery Smart Intelligence</p>
+              <p className={`text-[10px] md:text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Battery Smart Intelligence</p>
             </div>
           </div>
         </div>

@@ -9,6 +9,7 @@ import {
   X
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import logoImage from '../../assets/batterysmart_logo.jpg';
 
 const Sidebar = ({ activePage, setActivePage, isMobile = false, onClose }) => {
   const { isDarkMode } = useTheme();
@@ -30,16 +31,7 @@ const Sidebar = ({ activePage, setActivePage, isMobile = false, onClose }) => {
       {isMobile && (
         <div className="flex items-center justify-between px-4 mb-4">
           <div className="flex items-center gap-2">
-            <svg viewBox="0 0 100 100" className="w-8 h-8">
-              <defs>
-                <linearGradient id="sidebarLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor={isDarkMode ? "#22d3ee" : "#00E676"} />
-                  <stop offset="100%" stopColor={isDarkMode ? "#a855f7" : "#00C853"} />
-                </linearGradient>
-              </defs>
-              <rect x="35" y="5" width="30" height="8" rx="3" fill="url(#sidebarLogoGradient)"/>
-              <path d="M25 18 L75 18 L75 25 L55 50 L75 75 L75 82 L25 82 L25 75 L45 50 L25 25 Z" fill="url(#sidebarLogoGradient)"/>
-            </svg>
+            <img src={logoImage} alt="Battery Smart" className="w-8 h-8 rounded-lg object-cover" />
             <span className="text-white font-bold">Smart-Audit AI</span>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/10">
