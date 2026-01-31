@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { AlertTriangle, Clock, Brain, Zap, X, Play, Pause, Download, Volume2, VolumeX, SkipBack, SkipForward, RotateCcw, Loader2, MessageSquare, User, Headphones, FileAudio, Mail } from 'lucide-react';
+import { AlertTriangle, Clock, Brain, Zap, X, Play, Pause, Download, Volume2, VolumeX, SkipBack, SkipForward, RotateCcw, Loader2, MessageSquare, User, Headphones, FileAudio, Mail, FileText, Copy, CheckCircle } from 'lucide-react';
 import Card from '../shared/Card';
 import Badge from '../shared/Badge';
 import Button from '../shared/Button';
@@ -29,6 +29,8 @@ const getDirectAudioUrl = (driveUrl) => {
 const SupervisorAlerts = () => {
   const { calls, getHighRiskCalls } = useData();
   const [selectedCall, setSelectedCall] = useState(null);
+  const [reportModal, setReportModal] = useState(null); // For showing report popup
+  const [copied, setCopied] = useState(false);
   
   // Calculate real KPIs for accurate Prevention Impact
   const realKPIs = useMemo(() => calculateRealKPIs(calls), [calls]);
@@ -71,6 +73,125 @@ const SupervisorAlerts = () => {
   };
 
   const alerts = generateAlerts();
+
+  // Generate detailed report for a call
+  const generateDetailedReport = (alert) => {
+    const call = alert.fullCallData || alert;
+    const sopChecklist = [
+      { step: 'Greeting & Introduction', done: true },
+      { step: 'ID Verification', done: (call.sopAdherence || 75) > 70 },
+      { step: 'Problem Understanding', done: true },
+      { step: 'Solution Provided', done: true },
+      { step: 'Upsell Attempt', done: (call.sopAdherence || 75) > 80 },
+      { step: 'Closing Script', done: (call.sopAdherence || 75) > 60 },
+    ];
+
+    return {
+      callId: call.id || alert.callId,
+      agent: call.agent || alert.agent,
+      city: call.city || 'N/A',
+      callingNo: call.callingNo || 'N/A',
+      callDate: call.callDate || new Date().toLocaleDateString(),
+      duration: call.duration || '5:30',
+      callType: call.callType || alert.callType || 'General Inquiry',
+      riskLevel: call.riskLevel || (alert.priority === 'critical' ? 'high' : 'medium'),
+      sopAdherence: call.sopAdherence || alert.sopScore || 75,
+      qaScore: call.qaScore || call.sopAdherence || 75,
+      sentiment: call.sentiment || alert.sentiment || 'neutral',
+      reason: alert.reason,
+      summary: call.summary || alert.summary,
+      issues: call.issues || ['Low SOP adherence detected'],
+      suggestedAction: call.sopAdherence < 70 
+        ? 'Schedule immediate 1-on-1 coaching session with supervisor'
+        : call.sopAdherence < 80 
+          ? 'Review SOP guidelines with agent during next team meeting'
+          : 'Positive feedback - continue current practices',
+      sopChecklist,
+      audioUrl: call.audioUrl || 'N/A',
+      priority: alert.priority
+    };
+  };
+
+  const handleViewReport = (alert) => {
+    const report = generateDetailedReport(alert);
+    setReportModal(report);
+  };
+
+  const copyReportToClipboard = async () => {
+    if (!reportModal) return;
+    
+    const sopText = reportModal.sopChecklist
+      .map(item => `${item.done ? '✅' : '❌'} ${item.step}`)
+      .join('\n');
+    
+    const reportText = `
+═══════════════════════════════════════════════════
+🔋 SMART-AUDIT AI - CALL ANALYSIS REPORT
+═══════════════════════════════════════════════════
+
+📋 CALL DETAILS
+───────────────────────────────────────
+• Call ID: ${reportModal.callId}
+• Agent Name: ${reportModal.agent}
+• Customer Phone: ${reportModal.callingNo}
+• City: ${reportModal.city}
+• Call Date: ${reportModal.callDate}
+• Duration: ${reportModal.duration}
+• Risk Level: ${reportModal.riskLevel.toUpperCase()}
+• Priority: ${reportModal.priority.toUpperCase()}
+
+═══════════════════════════════════════════════════
+🎯 REASON FOR ALERT
+═══════════════════════════════════════════════════
+${reportModal.reason}
+Call Type: ${reportModal.callType}
+
+═══════════════════════════════════════════════════
+📊 QUALITY METRICS
+═══════════════════════════════════════════════════
+• QA Score: ${reportModal.qaScore}%
+• SOP Adherence: ${reportModal.sopAdherence}%
+• Customer Sentiment: ${reportModal.sentiment.toUpperCase()}
+
+═══════════════════════════════════════════════════
+🤖 AI-GENERATED ANALYSIS
+═══════════════════════════════════════════════════
+${reportModal.summary}
+
+═══════════════════════════════════════════════════
+⚠️ DETECTED ISSUES
+═══════════════════════════════════════════════════
+${reportModal.issues.map(issue => `• ${issue}`).join('\n')}
+
+═══════════════════════════════════════════════════
+💡 SUGGESTED ACTION
+═══════════════════════════════════════════════════
+${reportModal.suggestedAction}
+
+═══════════════════════════════════════════════════
+✅ SOP CHECKLIST
+═══════════════════════════════════════════════════
+${sopText}
+
+═══════════════════════════════════════════════════
+🔊 AUDIO RECORDING
+═══════════════════════════════════════════════════
+${reportModal.audioUrl}
+
+───────────────────────────────────────
+Generated by Smart-Audit AI
+Battery Smart Intelligence Platform
+Date: ${new Date().toLocaleString()}
+`.trim();
+
+    try {
+      await navigator.clipboard.writeText(reportText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
 
   // Audio player functions
   const formatTime = (time) => {
@@ -261,7 +382,7 @@ const SupervisorAlerts = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3">
+              <div className="flex gap-2 flex-wrap">
                 <Button 
                   variant={alert.priority === 'critical' ? 'danger' : 'primary'} 
                   size="sm" 
@@ -269,7 +390,15 @@ const SupervisorAlerts = () => {
                   onClick={() => handleReviewCall(alert)}
                 >
                   <Zap className="w-4 h-4 mr-1" />
-                  Review Call Now
+                  Review Call
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleViewReport(alert)}
+                >
+                  <FileText className="w-4 h-4 mr-1" />
+                  Report
                 </Button>
                 <Button 
                   variant="outline" 
@@ -277,10 +406,7 @@ const SupervisorAlerts = () => {
                   onClick={() => sendSupervisorAlertEmail(alert, alert.fullCallData)}
                 >
                   <Mail className="w-4 h-4 mr-1" />
-                  Send Mail
-                </Button>
-                <Button variant="ghost" size="sm">
-                  Dismiss
+                  Mail
                 </Button>
               </div>
             </Card>
@@ -506,6 +632,261 @@ const SupervisorAlerts = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Report Modal */}
+      <AnimatePresence>
+        {reportModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-[9998]"
+              onClick={() => setReportModal(null)}
+            />
+            
+            {/* Report Panel */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-4 md:inset-8 lg:inset-16 bg-white rounded-2xl shadow-2xl z-[9999] overflow-hidden flex flex-col"
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-navy to-navy/90 p-4 md:p-6 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">Call Analysis Report</h2>
+                    <p className="text-sm text-white/70">Call ID: {reportModal.callId}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-white hover:bg-white/20"
+                    onClick={copyReportToClipboard}
+                  >
+                    {copied ? <CheckCircle className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </Button>
+                  <button
+                    onClick={() => setReportModal(null)}
+                    className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Report Content - Chat Style */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 space-y-4">
+                {/* Priority Badge */}
+                <div className="flex justify-center">
+                  <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                    reportModal.priority === 'critical' 
+                      ? 'bg-danger/20 text-danger' 
+                      : 'bg-amber/20 text-amber'
+                  }`}>
+                    ⚠️ {reportModal.priority.toUpperCase()} PRIORITY ALERT
+                  </span>
+                </div>
+
+                {/* Call Details Card */}
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-navy/10 rounded-full flex items-center justify-center">
+                      <User className="w-4 h-4 text-navy" />
+                    </div>
+                    <span className="font-semibold text-navy">📋 Call Details</span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                    <div className="bg-gray-50 p-2 rounded-lg">
+                      <p className="text-xs text-gray-500">Call ID</p>
+                      <p className="font-medium">{reportModal.callId}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-lg">
+                      <p className="text-xs text-gray-500">Agent</p>
+                      <p className="font-medium">{reportModal.agent}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-lg">
+                      <p className="text-xs text-gray-500">Customer</p>
+                      <p className="font-medium">{reportModal.callingNo}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-lg">
+                      <p className="text-xs text-gray-500">City</p>
+                      <p className="font-medium">{reportModal.city}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-lg">
+                      <p className="text-xs text-gray-500">Date</p>
+                      <p className="font-medium">{reportModal.callDate}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-lg">
+                      <p className="text-xs text-gray-500">Duration</p>
+                      <p className="font-medium">{reportModal.duration}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reason for Alert */}
+                <div className="bg-gradient-to-r from-danger/10 to-amber/10 rounded-xl p-4 border-l-4 border-danger">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🎯</span>
+                    <span className="font-semibold text-gray-800">Reason for Alert</span>
+                  </div>
+                  <p className="text-gray-700 font-medium">{reportModal.reason}</p>
+                  <span className="inline-block mt-2 px-3 py-1 bg-white/50 rounded-full text-xs font-medium text-gray-600">
+                    📞 {reportModal.callType}
+                  </span>
+                </div>
+
+                {/* Quality Metrics */}
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">📊</span>
+                    <span className="font-semibold text-navy">Quality Metrics</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className={`text-2xl font-bold ${
+                        reportModal.qaScore >= 80 ? 'text-teal' : reportModal.qaScore >= 60 ? 'text-amber' : 'text-danger'
+                      }`}>
+                        {reportModal.qaScore}%
+                      </div>
+                      <p className="text-xs text-gray-500">QA Score</p>
+                    </div>
+                    <div>
+                      <div className={`text-2xl font-bold ${
+                        reportModal.sopAdherence >= 80 ? 'text-teal' : reportModal.sopAdherence >= 60 ? 'text-amber' : 'text-danger'
+                      }`}>
+                        {reportModal.sopAdherence}%
+                      </div>
+                      <p className="text-xs text-gray-500">SOP Adherence</p>
+                    </div>
+                    <div>
+                      <div className={`text-2xl font-bold ${
+                        reportModal.sentiment === 'positive' ? 'text-teal' : reportModal.sentiment === 'negative' ? 'text-danger' : 'text-amber'
+                      }`}>
+                        {reportModal.sentiment === 'positive' ? '😊' : reportModal.sentiment === 'negative' ? '😠' : '😐'}
+                      </div>
+                      <p className="text-xs text-gray-500">{reportModal.sentiment.toUpperCase()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Analysis */}
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-teal/10 rounded-full flex items-center justify-center">
+                      <Brain className="w-4 h-4 text-teal" />
+                    </div>
+                    <span className="font-semibold text-navy">🤖 AI-Generated Analysis</span>
+                  </div>
+                  <p className="text-gray-700 leading-relaxed">{reportModal.summary}</p>
+                </div>
+
+                {/* Issues Detected */}
+                <div className="bg-danger/5 rounded-xl p-4 border border-danger/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="w-5 h-5 text-danger" />
+                    <span className="font-semibold text-danger">⚠️ Issues Detected</span>
+                  </div>
+                  <ul className="space-y-2">
+                    {reportModal.issues.map((issue, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="text-danger mt-0.5">•</span>
+                        {issue}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Suggested Action */}
+                <div className="bg-teal/5 rounded-xl p-4 border border-teal/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">💡</span>
+                    <span className="font-semibold text-teal">Suggested Action</span>
+                  </div>
+                  <p className="text-gray-700">{reportModal.suggestedAction}</p>
+                </div>
+
+                {/* SOP Checklist */}
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">✅</span>
+                    <span className="font-semibold text-navy">SOP Checklist</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {reportModal.sopChecklist.map((item, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`flex items-center gap-2 p-2 rounded-lg ${
+                          item.done ? 'bg-teal/10' : 'bg-danger/10'
+                        }`}
+                      >
+                        <span className={item.done ? 'text-teal' : 'text-danger'}>
+                          {item.done ? '✅' : '❌'}
+                        </span>
+                        <span className={`text-sm ${item.done ? 'text-gray-700' : 'text-danger'}`}>
+                          {item.step}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Audio Link */}
+                {reportModal.audioUrl && reportModal.audioUrl !== 'N/A' && (
+                  <div className="bg-navy/5 rounded-xl p-4 border border-navy/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Headphones className="w-5 h-5 text-navy" />
+                      <span className="font-semibold text-navy">🔊 Audio Recording</span>
+                    </div>
+                    <a 
+                      href={reportModal.audioUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-teal hover:underline break-all"
+                    >
+                      {reportModal.audioUrl}
+                    </a>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="text-center text-xs text-gray-400 pt-4 border-t">
+                  <p>Generated by Smart-Audit AI • Battery Smart Intelligence Platform</p>
+                  <p>Report generated on {new Date().toLocaleString()}</p>
+                </div>
+              </div>
+
+              {/* Action Footer */}
+              <div className="p-4 bg-white border-t flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    sendSupervisorAlertEmail({ ...reportModal, fullCallData: reportModal }, reportModal);
+                    setReportModal(null);
+                  }}
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  Send via Email
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => setReportModal(null)}
+                >
+                  Close Report
+                </Button>
               </div>
             </motion.div>
           </>
