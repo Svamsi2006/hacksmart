@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { DataProvider } from './context/DataContext';
 import Layout from './components/layout/Layout';
 import Overview from './components/pages/Overview';
@@ -9,9 +10,19 @@ import AgentCoaching from './components/pages/AgentCoaching';
 import CityInsights from './components/pages/CityInsights';
 import SupervisorAlerts from './components/pages/SupervisorAlerts';
 import DataLoadingOverlay from './components/shared/DataLoadingOverlay';
+import LoadingScreen from './components/shared/LoadingScreen';
 
 function App() {
   const [activePage, setActivePage] = useState('overview');
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  // Initial loading screen
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 2500); // Show loading screen for 2.5 seconds
+    return () => clearTimeout(timer);
+  }, []);
 
   const renderPage = () => {
     switch (activePage) {
@@ -36,10 +47,18 @@ function App() {
 
   return (
     <DataProvider>
-      <DataLoadingOverlay />
-      <Layout activePage={activePage} setActivePage={setActivePage}>
-        {renderPage()}
-      </Layout>
+      <AnimatePresence mode="wait">
+        {isInitialLoading ? (
+          <LoadingScreen key="loading" message="Initializing dashboard..." />
+        ) : (
+          <>
+            <DataLoadingOverlay />
+            <Layout activePage={activePage} setActivePage={setActivePage}>
+              {renderPage()}
+            </Layout>
+          </>
+        )}
+      </AnimatePresence>
     </DataProvider>
   );
 }

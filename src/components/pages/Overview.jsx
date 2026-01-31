@@ -102,15 +102,15 @@ const Overview = ({ setActivePage }) => {
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border-2 border-purple-500/30"
+        className="p-3 md:p-4 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border-2 border-purple-500/30"
       >
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-3">
             <div className="p-2 bg-purple-500/20 rounded-lg">
-              <Key className="w-5 h-5 text-purple-600" />
+              <Key className="w-4 h-4 md:w-5 md:h-5 text-purple-600" />
             </div>
             <div>
-              <p className="font-bold text-navy flex items-center gap-2">
+              <p className="font-bold text-sm md:text-base text-navy flex items-center gap-2">
                 Deepgram API Key
                 {apiKeyStatus === 'saved' && (
                   <span className="flex items-center gap-1 text-xs text-teal font-normal">
@@ -118,42 +118,42 @@ const Overview = ({ setActivePage }) => {
                   </span>
                 )}
               </p>
-              <p className="text-xs text-gray-600">
+              <p className="text-[10px] md:text-xs text-gray-600">
                 Enter your Deepgram API key for audio transcription
               </p>
             </div>
           </div>
           
           {showApiInput ? (
-            <div className="flex items-center gap-2 flex-1 max-w-md">
+            <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:max-w-md">
               <input
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="Enter Deepgram API Key..."
-                className="flex-1 px-4 py-2 border border-purple-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="flex-1 px-3 md:px-4 py-2 border border-purple-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleApiKeySubmit}
-                className="bg-purple-600 hover:bg-purple-700 whitespace-nowrap"
+                className="bg-purple-600 hover:bg-purple-700 whitespace-nowrap text-xs md:text-sm"
               >
-                Activate Key
+                Activate
               </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 bg-white/50 px-3 py-1 rounded">
+              <span className="text-xs md:text-sm text-gray-600 bg-white/50 px-2 md:px-3 py-1 rounded">
                 ••••••••{apiKey.slice(-4)}
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleApiKeyReset}
-                className="text-purple-600 border-purple-300"
+                className="text-purple-600 border-purple-300 text-xs md:text-sm"
               >
-                Change Key
+                Change
               </Button>
             </div>
           )}
@@ -164,50 +164,52 @@ const Overview = ({ setActivePage }) => {
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className={`flex items-center justify-between p-4 rounded-xl ${
+        className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 md:p-4 rounded-xl ${
           dataSource === 'live' ? 'bg-teal/10 border border-teal/30' : 'bg-amber/10 border border-amber/30'
         }`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {dataSource === 'live' ? (
-            <Cloud className="w-5 h-5 text-teal" />
+            <Cloud className="w-4 h-4 md:w-5 md:h-5 text-teal" />
           ) : (
-            <Database className="w-5 h-5 text-amber" />
+            <Database className="w-4 h-4 md:w-5 md:h-5 text-amber" />
           )}
           <div>
-            <p className="font-semibold text-navy">
+            <p className="font-semibold text-sm md:text-base text-navy">
               {dataSource === 'live' ? 'Live Data Connected' : 'Demo Data Mode'}
             </p>
-            <p className="text-xs text-gray-600">
-              {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : 'Using sample data'}
-              {' • '}{calls.length} calls loaded
+            <p className="text-[10px] md:text-xs text-gray-600">
+              {lastUpdated ? `Last: ${lastUpdated.toLocaleTimeString()}` : 'Using sample data'}
+              {' • '}{calls.length} calls
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button 
             variant="outline" 
             size="sm"
             onClick={analyzeAllAudio}
             disabled={analyzing || calls.length === 0}
+            className="flex-1 sm:flex-none text-xs md:text-sm"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${analyzing ? 'animate-spin' : ''}`} />
-            {analyzing ? 'Analyzing...' : 'Re-Analyze All'}
+            <RefreshCw className={`w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Analyzing...' : 'Re-Analyze'}
           </Button>
           <Button 
             variant="primary" 
             size="sm"
             onClick={() => fetchFromGoogleSheets()}
             disabled={loading}
+            className="flex-1 sm:flex-none text-xs md:text-sm"
           >
-            <Cloud className="w-4 h-4 mr-2" />
-            Fetch Live Data
+            <Cloud className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+            Fetch Live
           </Button>
         </div>
       </motion.div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <KPICard
           title="Total Calls Audited Today"
           value={calls.length || kpiData.totalCalls}
