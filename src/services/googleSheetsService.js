@@ -65,14 +65,11 @@ const calculateRiskLevel = (issueType) => {
 };
 
 // Transform raw spreadsheet data to our dashboard format
-// ONLY takes first 5 rows as requested
+// Fetches ALL rows from the spreadsheet
 export const transformCallData = (rawData) => {
-  // Take only first 5 rows
-  const first5Rows = rawData.slice(0, 5);
+  console.log('Processing all rows:', rawData.length);
   
-  console.log('Processing first 5 rows:', first5Rows);
-  
-  return first5Rows.map((row, index) => {
+  return rawData.map((row, index) => {
     // Exact column names from the spreadsheet:
     // Date, Name, Issue type, Call recording link, Calling No.
     
