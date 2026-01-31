@@ -5,6 +5,10 @@ import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateRealKPIs, generateIssueSummary } from '../../services/analyticsService';
 
+// Grok + Gemini API keys for AI responses (from environment variables)
+const GROK_API_KEY = import.meta.env.VITE_GROK_API_KEY;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
 const ChatBot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -12,7 +16,7 @@ const ChatBot = () => {
     {
       id: 1,
       type: 'bot',
-      text: "👋 Hi! I'm Smart-Audit AI Assistant. Ask me about any data - agents, phone numbers, calls, revenue, or say 'help' for all options!",
+      text: "👋 Hi! I'm Smart-Audit AI Assistant powered by Grok & Gemini. Ask me about any data - agents, phone numbers, calls, revenue, or say 'help' for all options!",
       time: new Date()
     }
   ]);
@@ -157,14 +161,88 @@ const ChatBot = () => {
 
     // Help questions
     if (q.includes('help') || q.includes('what can you') || q.includes('how to')) {
-      return `🤖 **I can help you with:**\n\n• � **Phone numbers** - "phone no of Divya"\n• 👤 **Agent info** - "tell me about Jyoti"\n• 📊 Dashboard overview & metrics\n• 💰 Revenue analysis & leakage\n• 🚨 High-risk call alerts\n• 📈 QA score insights\n• 🏙️ City-wise data\n• 📋 SOP adherence info\n\nJust ask me anything about the dashboard data!`;
+      return `🤖 **I can help you with:**\n\n• 📞 **Phone numbers** - "phone no of Divya"\n• 👤 **Agent info** - "tell me about Jyoti"\n• 📊 Dashboard overview & metrics\n• 💰 Revenue analysis & leakage\n• 🚨 High-risk call alerts\n• 📈 QA score insights\n• 🏙️ City-wise data\n• 📋 SOP adherence info\n\nPowered by **Grok + Gemini AI** - just ask me anything!`;
     }
 
-    // Default response
-    return `I understand you're asking about "${query}". Here's what I found:\n\n• **Total Calls:** ${kpis.totalCalls}\n• **QA Score:** ${kpis.avgQAScore}%\n• **High-Risk:** ${kpis.highRiskCalls} alerts\n\n**Try asking:**\n- "Phone number of Divya"\n- "Tell me about Jyoti"\n- "Show me the overview"\n- "What's the revenue saved?"\n- "How many high-risk calls?"`;
+    // Default - return null to trigger AI response
+    return null;
   };
 
-  const handleSend = () => {
+  // AI-powered response using Grok/Gemini
+  const getAIResponse = async (query) => {
+    const stats = getStats();
+    const { kpis, agents, cities, topIssue } = stats;
+    
+    const context = `You are Smart-Audit AI, a helpful assistant for Battery Smart's call center QA dashboard.
+    
+Current Dashboard Data:
+- Total Calls: ${kpis.totalCalls}
+- Average QA Score: ${kpis.avgQAScore}%
+- High-Risk Calls: ${kpis.highRiskCalls}
+- Revenue Saved: ₹${kpis.revenueSaved.toLocaleString()}
+- Active Agents: ${agents.length} (${agents.slice(0, 5).join(', ')})
+- Cities: ${cities.join(', ')}
+- Top Issue: ${topIssue?.[0] || 'General'}
+
+Sample Agent Data:
+${calls.slice(0, 5).map(c => `- ${c.agent}: ${c.callingNo || 'N/A'} (${c.city}, ${c.callType})`).join('\n')}
+
+Answer the user's question based on this data. Be helpful, concise, and use emojis.`;
+
+    // Try Grok first
+    try {
+      const response = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROK_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'grok-beta',
+          messages: [
+            { role: 'system', content: context },
+            { role: 'user', content: query }
+          ],
+          max_tokens: 500,
+          temperature: 0.7
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content;
+        if (text) return `🤖 **(Grok AI)**\n\n${text}`;
+      }
+    } catch (e) {
+      console.warn('Grok failed, trying Gemini...', e);
+    }
+
+    // Fallback to Gemini
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${context}\n\nUser: ${query}` }] }],
+          generationConfig: { maxOutputTokens: 500 }
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return `🤖 **(Gemini AI)**\n\n${text}`;
+      }
+    } catch (e) {
+      console.error('Gemini also failed:', e);
+    }
+
+    // Final fallback
+    const { kpis: k } = getStats();
+    return `I understand you're asking about "${query}". Here's what I found:\n\n• **Total Calls:** ${k.totalCalls}\n• **QA Score:** ${k.avgQAScore}%\n• **High-Risk:** ${k.highRiskCalls} alerts\n\nTry asking about agents, phone numbers, revenue, or QA scores!`;
+  };
+
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const userMessage = {
@@ -175,21 +253,47 @@ const ChatBot = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI thinking
-    setTimeout(() => {
-      const response = generateResponse(input);
-      const botMessage = {
-        id: messages.length + 2,
-        type: 'bot',
-        text: response,
-        time: new Date()
-      };
-      setMessages(prev => [...prev, botMessage]);
+    // Try rule-based response first
+    const ruleResponse = generateResponse(currentInput);
+    
+    if (ruleResponse) {
+      // Use rule-based response
+      setTimeout(() => {
+        const botMessage = {
+          id: messages.length + 2,
+          type: 'bot',
+          text: ruleResponse,
+          time: new Date()
+        };
+        setMessages(prev => [...prev, botMessage]);
+        setIsTyping(false);
+      }, 800);
+    } else {
+      // Use AI for complex questions
+      try {
+        const aiResponse = await getAIResponse(currentInput);
+        const botMessage = {
+          id: messages.length + 2,
+          type: 'bot',
+          text: aiResponse,
+          time: new Date()
+        };
+        setMessages(prev => [...prev, botMessage]);
+      } catch (error) {
+        const botMessage = {
+          id: messages.length + 2,
+          type: 'bot',
+          text: "Sorry, I couldn't process that. Try asking about agents, phone numbers, revenue, or QA scores!",
+          time: new Date()
+        };
+        setMessages(prev => [...prev, botMessage]);
+      }
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+    }
   };
 
   const handleKeyPress = (e) => {

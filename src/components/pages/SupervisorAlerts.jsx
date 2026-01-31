@@ -1,12 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { AlertTriangle, Clock, Brain, Zap, X, Play, Pause, Download, Volume2, VolumeX, SkipBack, SkipForward, RotateCcw, Loader2, MessageSquare, User, Headphones, FileAudio } from 'lucide-react';
+import { AlertTriangle, Clock, Brain, Zap, X, Play, Pause, Download, Volume2, VolumeX, SkipBack, SkipForward, RotateCcw, Loader2, MessageSquare, User, Headphones, FileAudio, Mail } from 'lucide-react';
 import Card from '../shared/Card';
 import Badge from '../shared/Badge';
 import Button from '../shared/Button';
 import { useData } from '../../context/DataContext';
 import { supervisorAlerts as fallbackAlerts } from '../../data/mockData';
 import { calculateRealKPIs, formatIndianCurrency, generateIssueSummary } from '../../services/analyticsService';
+import { sendSupervisorAlertEmail } from '../../services/emailService';
 
 // Helper function to get direct audio URL from Google Drive
 const getDirectAudioUrl = (driveUrl) => {
@@ -262,6 +263,14 @@ const SupervisorAlerts = () => {
                 >
                   <Zap className="w-4 h-4 mr-1" />
                   Review Call Now
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => sendSupervisorAlertEmail(alert, alert.fullCallData)}
+                >
+                  <Mail className="w-4 h-4 mr-1" />
+                  Send Mail
                 </Button>
                 <Button variant="ghost" size="sm">
                   Dismiss

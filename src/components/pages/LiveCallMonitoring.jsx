@@ -9,6 +9,7 @@ import { liveCalls as fallbackCalls } from '../../data/mockData';
 import { transcribeWithRetry, formatTimestamp, generateSimulatedTranscription } from '../../services/transcriptionService';
 import { generateIssueSummary } from '../../services/analyticsService';
 import { useTheme } from '../../context/ThemeContext';
+import { sendCallReportEmail } from '../../services/emailService';
 
 // Helper function to get direct audio URL from Google Drive
 const getDirectAudioUrl = (driveUrl) => {
@@ -952,8 +953,14 @@ Smart-Audit AI Dashboard
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
-                  <Button variant="primary" className="flex-1">Take Action</Button>
-                  <Button variant="outline" className="flex-1">Send Coaching</Button>
+                  <Button 
+                    variant="primary" 
+                    className="flex-1"
+                    onClick={() => sendCallReportEmail(selectedCall)}
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send Mail
+                  </Button>
                 </div>
               </div>
             </motion.div>
