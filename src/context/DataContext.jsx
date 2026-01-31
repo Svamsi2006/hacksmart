@@ -169,24 +169,14 @@ export const DataProvider = ({ children }) => {
       // City filter
       if (city && city !== 'All Cities' && call.city !== city) return false;
       
-      // Date filter
+      // Date filter - using actual date field from data (format: "1/29/26 1:45 PM")
       if (dateRange && dateRange !== 'All Time') {
-        const callDate = new Date(call.callDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const callDateStr = call.date || call.callDate || '';
+        const callDatePart = callDateStr.split(' ')[0]; // Get just "1/29/26"
         
-        if (dateRange === 'Today') {
-          const callDay = new Date(callDate);
-          callDay.setHours(0, 0, 0, 0);
-          if (callDay.getTime() !== today.getTime()) return false;
-        } else if (dateRange === 'Last 7 Days') {
-          const weekAgo = new Date(today);
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          if (callDate < weekAgo) return false;
-        } else if (dateRange === 'Last 30 Days') {
-          const monthAgo = new Date(today);
-          monthAgo.setDate(monthAgo.getDate() - 30);
-          if (callDate < monthAgo) return false;
+        // Filter by specific date like "1/29/26"
+        if (dateRange.includes('/')) {
+          if (callDatePart !== dateRange) return false;
         }
       }
       

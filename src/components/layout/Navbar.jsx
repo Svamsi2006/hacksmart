@@ -10,7 +10,8 @@ const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
   const [showLogoutMenu, setShowLogoutMenu] = useState(false);
 
   const cities = ['All Cities', 'Delhi', 'Noida', 'Gurgaon', 'Ghaziabad', 'Bangalore', 'Pune', 'Hyderabad'];
-  const dateRanges = ['All Time', 'Today', 'Last 7 Days', 'Last 30 Days'];
+  // Actual dates from Google Sheets data
+  const dateRanges = ['All Time', '1/29/26', '1/28/26'];
 
   return (
     <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 fixed top-0 left-0 right-0 z-50">

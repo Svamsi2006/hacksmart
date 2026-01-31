@@ -194,11 +194,23 @@ const LiveCallMonitoring = () => {
     return colors[sentiment] || 'bg-gray-400';
   };
 
+  // Format date from Google Sheets format like "1/29/26 1:45 PM"
   const formatDate = (dateStr) => {
-    if (!dateStr) return 'Today';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (!dateStr) return '1/28/26';
+    
+    // Extract just the date part (ignore time)
+    const datePart = dateStr.split(' ')[0];
+    
+    // Validate it's a real date format (M/D/YY)
+    if (datePart && datePart.includes('/')) {
+      const parts = datePart.split('/');
+      if (parts.length >= 2) {
+        return datePart; // Return the date like "1/29/26"
+      }
+    }
+    
+    // Fallback for any irrelevant/invalid date
+    return '1/28/26';
   };
 
   return (
@@ -287,7 +299,7 @@ const LiveCallMonitoring = () => {
                   onClick={() => setSelectedCall(call)}
                 >
                   <td className="px-6 py-4 text-sm font-medium text-navy">{call.id}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{formatDate(call.callDate)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{formatDate(call.date || call.callDate)}</td>
                   <td className="px-6 py-4 text-sm text-gray-700">{call.agent}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{call.city}</td>
                   <td className="px-6 py-4">
