@@ -101,10 +101,8 @@ const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
           {/* Notifications */}
           <NotificationCenter />
 
-          {/* Data Settings */}
-          <div className="hidden sm:block">
-            <DataSettings />
-          </div>
+          {/* Data Settings - Action Buttons */}
+          <DataSettings />
 
           {/* Profile with Logout */}
           <div className="relative">
