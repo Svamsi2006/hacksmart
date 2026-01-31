@@ -49,19 +49,25 @@ const SupervisorAlerts = () => {
     
     if (highRiskCalls.length === 0) return fallbackAlerts;
 
-    return highRiskCalls.slice(0, 8).map((call, idx) => ({
-      id: call.id,
-      callId: call.id,
-      agent: call.agent,
-      priority: call.sentiment === 'negative' ? 'critical' : 'high',
-      sopScore: call.sopAdherence,
-      timestamp: new Date(call.callDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      summary: call.summary || 'AI detected compliance issues during this call. Immediate review recommended.',
-      reason: call.issues?.[0] || 'Low SOP adherence detected',
-      sentiment: call.sentiment || 'neutral',
-      // Include full call data for review panel
-      fullCallData: call
-    }));
+    return highRiskCalls.slice(0, 8).map((call, idx) => {
+      // Generate meaningful reason based on call type
+      const callReason = generateIssueSummary(call.callType, call.riskLevel);
+      
+      return {
+        id: call.id,
+        callId: call.id,
+        agent: call.agent,
+        priority: call.sentiment === 'negative' ? 'critical' : 'high',
+        sopScore: call.sopAdherence,
+        timestamp: new Date(call.callDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        summary: call.summary || 'AI detected compliance issues during this call. Immediate review recommended.',
+        reason: callReason,
+        callType: call.callType,
+        sentiment: call.sentiment || 'neutral',
+        // Include full call data for review panel
+        fullCallData: call
+      };
+    });
   };
 
   const alerts = generateAlerts();
@@ -240,15 +246,16 @@ const SupervisorAlerts = () => {
 
               {/* Flag Reason */}
               <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-600 mb-2">Reason for Flag</p>
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    alert.priority === 'critical' 
-                      ? 'bg-danger/20 text-danger' 
-                      : 'bg-amber/20 text-amber'
-                  }`}>
-                    {alert.reason}
-                  </span>
+                <p className="text-xs font-semibold text-gray-600 mb-2">🎯 Reason for Alert</p>
+                <p className="text-sm text-gray-700 bg-gradient-to-r from-danger/10 to-amber/10 p-3 rounded-lg border-l-4 border-danger">
+                  {alert.reason}
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  {alert.callType && (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                      📞 {alert.callType}
+                    </span>
+                  )}
                   <Badge variant={alert.sentiment}>{alert.sentiment?.toUpperCase() || 'NEUTRAL'}</Badge>
                 </div>
               </div>
