@@ -1,12 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, X, Play, Pause, Download, Brain, FileAudio, MessageSquare, User, Headphones, Clock, Loader2, Filter, Volume2, VolumeX, RotateCcw, SkipBack, SkipForward } from 'lucide-react';
+import { RefreshCw, X, Play, Pause, Download, Brain, FileAudio, MessageSquare, User, Headphones, Clock, Loader2, Filter, Volume2, VolumeX, RotateCcw, SkipBack, SkipForward, FileText } from 'lucide-react';
 import Card from '../shared/Card';
 import Badge from '../shared/Badge';
 import Button from '../shared/Button';
 import { useData } from '../../context/DataContext';
 import { liveCalls as fallbackCalls } from '../../data/mockData';
 import { transcribeWithRetry, formatTimestamp, generateSimulatedTranscription } from '../../services/transcriptionService';
+import { generateIssueSummary } from '../../services/analyticsService';
 
 // Helper function to get direct audio URL from Google Drive
 const getDirectAudioUrl = (driveUrl) => {
@@ -264,7 +265,7 @@ const LiveCallMonitoring = () => {
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Time</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Agent</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">City</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Duration</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Issue Summary</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Sentiment</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">QA Score</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Risk Level</th>
@@ -285,7 +286,14 @@ const LiveCallMonitoring = () => {
                   <td className="px-6 py-4 text-sm text-gray-500">{formatDate(call.callDate)}</td>
                   <td className="px-6 py-4 text-sm text-gray-700">{call.agent}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{call.city}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{call.duration || '5:42'}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-start gap-2 max-w-[280px]">
+                      <FileText className="w-4 h-4 text-teal flex-shrink-0 mt-0.5" />
+                      <span className="text-xs text-gray-600 leading-relaxed line-clamp-2" title={generateIssueSummary(call.callType, call.riskLevel)}>
+                        {generateIssueSummary(call.callType, call.riskLevel)}
+                      </span>
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${getSentimentColor(call.sentiment)}`}></div>

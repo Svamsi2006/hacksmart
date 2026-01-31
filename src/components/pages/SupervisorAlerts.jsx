@@ -1,11 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { AlertTriangle, Clock, Brain, Zap, X, Play, Pause, Download, Volume2, VolumeX, SkipBack, SkipForward, RotateCcw, Loader2, MessageSquare, User, Headphones, FileAudio } from 'lucide-react';
 import Card from '../shared/Card';
 import Badge from '../shared/Badge';
 import Button from '../shared/Button';
 import { useData } from '../../context/DataContext';
 import { supervisorAlerts as fallbackAlerts } from '../../data/mockData';
+import { calculateRealKPIs, formatIndianCurrency, generateIssueSummary } from '../../services/analyticsService';
 
 // Helper function to get direct audio URL from Google Drive
 const getDirectAudioUrl = (driveUrl) => {
@@ -27,6 +28,10 @@ const getDirectAudioUrl = (driveUrl) => {
 const SupervisorAlerts = () => {
   const { calls, getHighRiskCalls } = useData();
   const [selectedCall, setSelectedCall] = useState(null);
+  
+  // Calculate real KPIs for accurate Prevention Impact
+  const realKPIs = useMemo(() => calculateRealKPIs(calls), [calls]);
+  const preventionImpact = useMemo(() => Math.round(realKPIs.revenueSaved * 0.5), [realKPIs]);
   
   // Audio player state
   const audioRef = useRef(null);
@@ -283,8 +288,8 @@ const SupervisorAlerts = () => {
 
         <Card className="p-6 bg-teal/5 border-teal/20">
           <p className="text-sm font-semibold text-gray-600 mb-2">Prevention Impact</p>
-          <p className="text-3xl font-bold text-navy mb-2">₹2.1L</p>
-          <p className="text-xs text-gray-600">Potential damage prevented today</p>
+          <p className="text-3xl font-bold text-navy mb-2">{formatIndianCurrency(preventionImpact)}</p>
+          <p className="text-xs text-gray-600">Potential damage prevented today (50% of {formatIndianCurrency(realKPIs.revenueSaved)})</p>
         </Card>
       </div>
 

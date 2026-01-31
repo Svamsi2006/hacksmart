@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Phone, TrendingUp, AlertTriangle, DollarSign, RefreshCw, Cloud, Database, Key, CheckCircle, XCircle } from 'lucide-react';
 import KPICard from '../shared/KPICard';
 import Card from '../shared/Card';
@@ -8,7 +8,15 @@ import LineChart from '../charts/LineChart';
 import BarChart from '../charts/BarChart';
 import DonutChart from '../charts/DonutChart';
 import { useData } from '../../context/DataContext';
-import { kpiData as fallbackKpi, dailyTrend, callQuality, sentimentData } from '../../data/mockData';
+import { kpiData as fallbackKpi, dailyTrend as fallbackTrend, callQuality as fallbackQuality, sentimentData as fallbackSentiment } from '../../data/mockData';
+import { 
+  calculateRealKPIs, 
+  calculateDailyTrend, 
+  calculateCallQuality, 
+  calculateSentimentData, 
+  generateRealInsights,
+  formatIndianCurrency 
+} from '../../services/analyticsService';
 
 const Overview = ({ setActivePage }) => {
   const { 
@@ -44,9 +52,17 @@ const Overview = ({ setActivePage }) => {
     setApiKeyStatus('empty');
   };
 
+  // Calculate REAL analytics from actual call data
+  const realKPIs = useMemo(() => calculateRealKPIs(calls), [calls]);
+  const dailyTrend = useMemo(() => calculateDailyTrend(calls), [calls]);
+  const callQuality = useMemo(() => calculateCallQuality(calls), [calls]);
+  const sentimentData = useMemo(() => calculateSentimentData(calls), [calls]);
+  
   // Use real analytics if available, otherwise fallback
-  const kpiData = analytics?.kpis || fallbackKpi;
-  const chartData = analytics?.charts || { dailyTrend, callQuality, sentimentData };
+  const kpiData = calls.length > 0 ? realKPIs : fallbackKpi;
+  const chartData = calls.length > 0 
+    ? { dailyTrend, callQuality, sentimentData } 
+    : { dailyTrend: fallbackTrend, callQuality: fallbackQuality, sentimentData: fallbackSentiment };
   const highRiskCalls = getHighRiskCalls();
 
   // Navigate to Supervisor Alerts when clicking high-risk
@@ -56,40 +72,18 @@ const Overview = ({ setActivePage }) => {
     }
   };
 
-  // Dynamic insights based on real data
-  const generateInsights = () => {
-    const positiveCount = calls.filter(c => c.sentiment === 'positive').length;
-    const negativeCount = calls.filter(c => c.sentiment === 'negative').length;
-    const positivePercent = calls.length > 0 ? Math.round((positiveCount / calls.length) * 100) : 62;
-    const avgQA = calls.length > 0 
-      ? Math.round(calls.reduce((sum, c) => sum + (c.qaScore || 0), 0) / calls.length)
-      : 78;
-
-    return [
-      {
-        color: 'teal',
-        title: `${avgQA}% QA Score Achievement`,
-        description: `Across ${calls.length} analyzed calls. ${dataSource === 'live' ? 'Live data from Google Sheets.' : 'Demo data displayed.'}`
-      },
-      {
-        color: 'amber',
-        title: `${highRiskCalls.length} High-Risk Calls Detected`,
-        description: `Most common: ID verification skipped, resolution mismatch.`
-      },
-      {
-        color: 'danger',
-        title: `₹${kpiData.revenueSaved || '3.4'}L Revenue Saved`,
-        description: 'Prevented leakage through real-time coaching and SOP adherence monitoring.'
-      },
-      {
-        color: 'blue',
-        title: `${positivePercent}% Positive Sentiment`,
-        description: `${negativeCount} negative calls require attention for improvement.`
-      }
-    ];
-  };
-
-  const insights = generateInsights();
+  // Generate accurate insights from real data using analytics service
+  const insights = useMemo(() => {
+    if (calls.length === 0) {
+      return [
+        { color: 'teal', title: '78% QA Score Achievement', description: 'Demo mode - Connect to Google Sheets for live data.' },
+        { color: 'amber', title: '12 High-Risk Calls Detected', description: 'Demo data displayed.' },
+        { color: 'danger', title: '₹3.4L Revenue Saved', description: 'Demo mode - Connect for actual calculations.' },
+        { color: 'blue', title: '62% Positive Sentiment', description: 'Demo data - Real analysis requires live connection.' }
+      ];
+    }
+    return generateRealInsights(calls);
+  }, [calls]);
 
   return (
     <motion.div
@@ -212,18 +206,18 @@ const Overview = ({ setActivePage }) => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <KPICard
           title="Total Calls Audited Today"
-          value={calls.length || kpiData.totalCalls}
+          value={kpiData.totalCalls || 0}
           icon={Phone}
           trend={kpiData.trend?.calls || 12.5}
           helper="Across all cities"
         />
         <KPICard
           title="Average QA Score"
-          value={analytics?.avgQAScore || kpiData.avgQAScore}
+          value={kpiData.avgQAScore || 0}
           icon={TrendingUp}
           trend={kpiData.trend?.qaScore || 2.3}
           suffix="%"
-          helper="Company-wide average"
+          helper="Weighted by risk level"
         />
         <motion.div 
           whileHover={{ scale: 1.02 }} 
@@ -233,7 +227,7 @@ const Overview = ({ setActivePage }) => {
         >
           <KPICard
             title="High-Risk Calls Flagged"
-            value={highRiskCalls.length || kpiData.highRiskCalls}
+            value={kpiData.highRiskCalls || 0}
             icon={AlertTriangle}
             trend={kpiData.trend?.risk || -5.2}
             helper="Click to view alerts →"
@@ -242,11 +236,10 @@ const Overview = ({ setActivePage }) => {
         </motion.div>
         <KPICard
           title="Estimated Revenue Saved"
-          value={kpiData.revenueSaved || '3.4L'}
+          value={formatIndianCurrency(kpiData.revenueSaved || 0)}
           icon={DollarSign}
           trend={kpiData.trend?.revenue || 8.7}
-          prefix="₹"
-          helper="From leakage prevention"
+          helper={`High: ₹${(kpiData.highRiskCalls || 0) * 1500} | Med: ₹${(kpiData.mediumRiskCalls || 0) * 500} | Low: ₹${(kpiData.lowRiskCalls || 0) * 100}`}
         />
       </div>
 
