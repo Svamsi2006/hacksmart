@@ -239,7 +239,7 @@ const Overview = ({ setActivePage }) => {
           value={formatIndianCurrency(kpiData.revenueSaved || 0)}
           icon={DollarSign}
           trend={kpiData.trend?.revenue || 8.7}
-          helper={`High: ₹${(kpiData.highRiskCalls || 0) * 1500} | Med: ₹${(kpiData.mediumRiskCalls || 0) * 500} | Low: ₹${(kpiData.lowRiskCalls || 0) * 100}`}
+          helper={`High: ₹${((kpiData.highRiskCalls || 0) * 1500).toLocaleString()} | Med: ₹${((kpiData.mediumRiskCalls || 0) * 500).toLocaleString()} | Low: ₹${((kpiData.lowRiskCalls || 0) * 100).toLocaleString()}`}
         />
       </div>
 

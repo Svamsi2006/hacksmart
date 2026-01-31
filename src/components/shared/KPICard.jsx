@@ -4,18 +4,26 @@ import { useEffect, useState } from 'react';
 
 const KPICard = ({ title, value, icon: Icon, trend, helper, suffix = '', prefix = '', onClick }) => {
   const [displayValue, setDisplayValue] = useState(0);
+  const isStringValue = typeof value === 'string';
 
   useEffect(() => {
-    // Animate counter
+    // Skip animation for string values
+    if (isStringValue) {
+      setDisplayValue(value);
+      return;
+    }
+    
+    // Animate counter for numeric values
+    const numValue = Number(value) || 0;
     const duration = 2000;
     const steps = 60;
-    const increment = value / steps;
+    const increment = numValue / steps;
     let current = 0;
     
     const timer = setInterval(() => {
       current += increment;
-      if (current >= value) {
-        setDisplayValue(value);
+      if (current >= numValue) {
+        setDisplayValue(numValue);
         clearInterval(timer);
       } else {
         setDisplayValue(Math.floor(current));
@@ -23,7 +31,7 @@ const KPICard = ({ title, value, icon: Icon, trend, helper, suffix = '', prefix 
     }, duration / steps);
 
     return () => clearInterval(timer);
-  }, [value]);
+  }, [value, isStringValue]);
 
   const formatValue = (val) => {
     if (typeof val === 'number' && val >= 1000) {
@@ -66,7 +74,7 @@ const KPICard = ({ title, value, icon: Icon, trend, helper, suffix = '', prefix 
       
       <h3 className="text-2xl md:text-3xl font-bold text-navy mb-1 md:mb-2">
         {prefix}
-        {typeof value === 'number' && value % 1 !== 0 ? displayValue.toFixed(1) : formatValue(displayValue)}
+        {isStringValue ? displayValue : (typeof displayValue === 'number' && displayValue % 1 !== 0 ? displayValue.toFixed(1) : formatValue(displayValue))}
         {suffix}
       </h3>
       
