@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
+import { useTheme } from '../../context/ThemeContext';
 
 const Layout = ({ children, activePage, setActivePage, onLogout }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isDarkMode } = useTheme();
 
   useEffect(() => {
     const checkMobile = () => {
@@ -28,7 +30,7 @@ const Layout = ({ children, activePage, setActivePage, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-background'}`}>
       <Navbar 
         currentPage={pageNames[activePage]} 
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}

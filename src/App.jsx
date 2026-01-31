@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { DataProvider } from './context/DataContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import Layout from './components/layout/Layout';
 import Overview from './components/pages/Overview';
 import LiveCallMonitoring from './components/pages/LiveCallMonitoring';
@@ -59,7 +60,28 @@ function App() {
   };
 
   return (
-    <DataProvider>
+    <ThemeProvider>
+      <DataProvider>
+        <AppContent 
+          isAuthenticated={isAuthenticated}
+          isInitialLoading={isInitialLoading}
+          handleLogin={handleLogin}
+          handleLogout={handleLogout}
+          activePage={activePage}
+          setActivePage={setActivePage}
+          renderPage={renderPage}
+        />
+      </DataProvider>
+    </ThemeProvider>
+  );
+}
+
+// Separate component to use theme context
+function AppContent({ isAuthenticated, isInitialLoading, handleLogin, handleLogout, activePage, setActivePage, renderPage }) {
+  const { isDarkMode } = useTheme();
+  
+  return (
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-background'}`}>
       <AnimatePresence mode="wait">
         {!isAuthenticated ? (
           <LoginScreen key="login" onLogin={handleLogin} />
@@ -75,7 +97,7 @@ function App() {
           </>
         )}
       </AnimatePresence>
-    </DataProvider>
+    </div>
   );
 }
 

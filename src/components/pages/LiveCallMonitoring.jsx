@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, X, Play, Pause, Download, Brain, FileAudio, MessageSquare, User, Headphones, Clock, Loader2, Filter, Volume2, VolumeX, RotateCcw, SkipBack, SkipForward, FileText } from 'lucide-react';
+import { RefreshCw, X, Play, Pause, Download, Brain, FileAudio, MessageSquare, User, Headphones, Clock, Loader2, Filter, Volume2, VolumeX, RotateCcw, SkipBack, SkipForward, FileText, Search, Phone, FileSpreadsheet, Mail } from 'lucide-react';
 import Card from '../shared/Card';
 import Badge from '../shared/Badge';
 import Button from '../shared/Button';
@@ -8,6 +8,7 @@ import { useData } from '../../context/DataContext';
 import { liveCalls as fallbackCalls } from '../../data/mockData';
 import { transcribeWithRetry, formatTimestamp, generateSimulatedTranscription } from '../../services/transcriptionService';
 import { generateIssueSummary } from '../../services/analyticsService';
+import { useTheme } from '../../context/ThemeContext';
 
 // Helper function to get direct audio URL from Google Drive
 const getDirectAudioUrl = (driveUrl) => {
@@ -34,12 +35,15 @@ const getDirectAudioUrl = (driveUrl) => {
 
 const LiveCallMonitoring = () => {
   const { calls, getLiveCalls, getFilteredCalls, analyzeAllAudio, analyzing, refresh, loading, selectedCity, selectedDateRange } = useData();
+  const { isDarkMode } = useTheme();
   const [selectedCall, setSelectedCall] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [transcription, setTranscription] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [activeTab, setActiveTab] = useState('transcription');
   const [riskFilter, setRiskFilter] = useState('all'); // 'all', 'high', 'medium', 'low'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
   
   // Audio player state
   const audioRef = useRef(null);
@@ -53,12 +57,133 @@ const LiveCallMonitoring = () => {
 
   // Use filtered calls based on navbar selections
   const allFilteredCalls = getFilteredCalls();
-  const allCalls = allFilteredCalls.length > 0 ? allFilteredCalls.slice(0, 15) : getLiveCalls(15);
+  const allCalls = allFilteredCalls.length > 0 ? allFilteredCalls.slice(0, 100) : getLiveCalls(100);
   
-  // Apply risk level filter
-  const displayCalls = riskFilter === 'all' 
-    ? allCalls 
-    : allCalls.filter(call => call.riskLevel === riskFilter);
+  // Apply risk level filter and search
+  const displayCalls = allCalls.filter(call => {
+    // Risk filter
+    if (riskFilter !== 'all' && call.riskLevel !== riskFilter) return false;
+    
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        call.id?.toLowerCase().includes(query) ||
+        call.agent?.toLowerCase().includes(query) ||
+        call.callingNo?.includes(query) ||
+        call.city?.toLowerCase().includes(query) ||
+        call.callType?.toLowerCase().includes(query)
+      );
+    }
+    return true;
+  }).slice(0, 15);
+
+  // Export functions
+  const exportToCSV = () => {
+    const headers = ['Call ID', 'Date', 'Agent', 'Phone', 'City', 'Issue Type', 'Sentiment', 'QA Score', 'Risk Level'];
+    const rows = displayCalls.map(call => [
+      call.id,
+      formatDate(call.date || call.callDate),
+      call.agent,
+      call.callingNo || 'N/A',
+      call.city,
+      call.callType,
+      call.sentiment,
+      call.qaScore || call.sopAdherence,
+      call.riskLevel
+    ]);
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `call-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
+  const exportToPDF = () => {
+    // Create printable content
+    const printContent = `
+      <html>
+        <head>
+          <title>Smart-Audit AI - Call Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #0A1628; border-bottom: 2px solid #00E676; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background: #0A1628; color: white; }
+            .high { color: #EF4444; font-weight: bold; }
+            .medium { color: #F59E0B; font-weight: bold; }
+            .low { color: #00E676; font-weight: bold; }
+            .footer { margin-top: 30px; font-size: 10px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <h1>🔋 Smart-Audit AI - Call Report</h1>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+          <p>Total Calls: ${displayCalls.length} | Filter: ${riskFilter === 'all' ? 'All Risks' : riskFilter + ' risk'}</p>
+          <table>
+            <tr>
+              <th>Call ID</th>
+              <th>Date</th>
+              <th>Agent</th>
+              <th>Phone</th>
+              <th>City</th>
+              <th>QA Score</th>
+              <th>Risk</th>
+            </tr>
+            ${displayCalls.map(call => `
+              <tr>
+                <td>${call.id}</td>
+                <td>${formatDate(call.date || call.callDate)}</td>
+                <td>${call.agent}</td>
+                <td>${call.callingNo || 'N/A'}</td>
+                <td>${call.city}</td>
+                <td>${call.qaScore || call.sopAdherence}%</td>
+                <td class="${call.riskLevel}">${call.riskLevel?.toUpperCase()}</td>
+              </tr>
+            `).join('')}
+          </table>
+          <div class="footer">
+            <p>Battery Smart Intelligence | Smart-Audit AI Dashboard</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+    setShowExportMenu(false);
+  };
+
+  const sendEmailReport = () => {
+    const subject = encodeURIComponent(`Smart-Audit AI Report - ${new Date().toLocaleDateString()}`);
+    const body = encodeURIComponent(`
+Call Monitoring Report
+Generated: ${new Date().toLocaleString()}
+
+Summary:
+- Total Calls: ${displayCalls.length}
+- High Risk: ${displayCalls.filter(c => c.riskLevel === 'high').length}
+- Medium Risk: ${displayCalls.filter(c => c.riskLevel === 'medium').length}
+- Low Risk: ${displayCalls.filter(c => c.riskLevel === 'low').length}
+
+Top Issues:
+${displayCalls.slice(0, 5).map(c => `- ${c.id}: ${c.callType} (${c.riskLevel} risk)`).join('\n')}
+
+--
+Battery Smart Intelligence
+Smart-Audit AI Dashboard
+    `);
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+    setShowExportMenu(false);
+  };
 
   // Audio player functions
   const formatTime = (time) => {
@@ -223,18 +348,41 @@ const LiveCallMonitoring = () => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-navy">Live Call Monitoring</h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-navy'}`}>Live Call Monitoring</h2>
+          <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             Real-time call quality analysis • {displayCalls.length} calls displayed
             {selectedCity !== 'All Cities' && ` • ${selectedCity}`}
             {selectedDateRange !== 'All Time' && ` • ${selectedDateRange}`}
             {riskFilter !== 'all' && ` • ${riskFilter} risk`}
+            {searchQuery && ` • Search: "${searchQuery}"`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Search Bar */}
+          <div className={`relative flex items-center ${isDarkMode ? 'bg-slate-800/50' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'} rounded-lg shadow-sm`}>
+            <Search className={`w-4 h-4 ml-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            <input
+              type="text"
+              placeholder="Search Call ID, Agent, Phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`w-48 md:w-64 px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-teal/50 ${
+                isDarkMode ? 'bg-transparent text-white placeholder-gray-500' : 'bg-transparent text-gray-700 placeholder-gray-400'
+              }`}
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className={`mr-2 p-1 rounded-full ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
+              >
+                <X className="w-3 h-3 text-gray-400" />
+              </button>
+            )}
+          </div>
+          
           {/* Risk Level Filter */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            <Filter className="w-4 h-4 text-gray-500 ml-2" />
+          <div className={`flex items-center gap-1 ${isDarkMode ? 'bg-slate-800/50' : 'bg-gray-100'} rounded-lg p-1`}>
+            <Filter className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} ml-2`} />
             {['all', 'high', 'medium', 'low'].map((level) => (
               <button
                 key={level}
@@ -248,13 +396,67 @@ const LiveCallMonitoring = () => {
                         : level === 'low' 
                           ? 'bg-teal text-white'
                           : 'bg-navy text-white'
-                    : 'text-gray-600 hover:bg-gray-200'
+                    : isDarkMode ? 'text-gray-400 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {level === 'all' ? 'All' : level.charAt(0).toUpperCase() + level.slice(1)}
               </button>
             ))}
           </div>
+          
+          {/* Export Button */}
+          <div className="relative">
+            <Button 
+              onClick={() => setShowExportMenu(!showExportMenu)} 
+              variant="outline" 
+              className={`flex items-center gap-2 ${isDarkMode ? 'border-slate-700 text-gray-300 hover:bg-slate-800' : ''}`}
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </Button>
+            
+            {/* Export Dropdown */}
+            {showExportMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`absolute right-0 top-12 z-50 ${
+                  isDarkMode 
+                    ? 'bg-slate-800/95 backdrop-blur-xl border-slate-700' 
+                    : 'bg-white border-gray-200'
+                } border rounded-xl shadow-2xl overflow-hidden min-w-[200px]`}
+              >
+                <button
+                  onClick={exportToCSV}
+                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm ${
+                    isDarkMode ? 'hover:bg-slate-700 text-gray-200' : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-green-500" />
+                  Export as CSV/Excel
+                </button>
+                <button
+                  onClick={exportToPDF}
+                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm ${
+                    isDarkMode ? 'hover:bg-slate-700 text-gray-200' : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <FileText className="w-4 h-4 text-red-500" />
+                  Export as PDF
+                </button>
+                <button
+                  onClick={sendEmailReport}
+                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm ${
+                    isDarkMode ? 'hover:bg-slate-700 text-gray-200' : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <Mail className="w-4 h-4 text-blue-500" />
+                  Email Report
+                </button>
+              </motion.div>
+            )}
+          </div>
+
           <Button 
             onClick={analyzeAllAudio} 
             variant="primary" 
@@ -264,7 +466,7 @@ const LiveCallMonitoring = () => {
             <Brain className={`w-4 h-4 ${analyzing ? 'animate-pulse' : ''}`} />
             {analyzing ? 'Analyzing...' : 'Analyze All'}
           </Button>
-          <Button onClick={handleRefresh} variant="outline" className="flex items-center gap-2">
+          <Button onClick={handleRefresh} variant="outline" className={`flex items-center gap-2 ${isDarkMode ? 'border-slate-700 text-gray-300 hover:bg-slate-800' : ''}`}>
             <RefreshCw className={`w-4 h-4 ${isRefreshing || loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -272,40 +474,62 @@ const LiveCallMonitoring = () => {
       </div>
 
       {/* Live Calls Table */}
-      <Card className="overflow-hidden">
+      <Card className={`overflow-hidden ${isDarkMode ? 'bg-slate-900/50 backdrop-blur-xl border-slate-800' : ''}`}>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className={`${isDarkMode ? 'bg-slate-800/80' : 'bg-gray-50'} border-b ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Call ID</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Agent</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">City</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Issue Summary</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Sentiment</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">QA Score</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Risk Level</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Call ID</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Date</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Agent</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Phone</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>City</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Issue Summary</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Sentiment</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>QA Score</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Risk Level</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-gray-200'}`}>
               {displayCalls.map((call, index) => (
                 <motion.tr
                   key={call.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.03 }}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  className={`cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-gray-50'}`}
                   onClick={() => setSelectedCall(call)}
                 >
-                  <td className="px-6 py-4 text-sm font-medium text-navy">{call.id}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{formatDate(call.date || call.callDate)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{call.agent}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{call.city}</td>
+                  <td className={`px-6 py-4 text-sm font-medium ${isDarkMode ? 'text-teal' : 'text-navy'}`}>{call.id}</td>
+                  <td className={`px-6 py-4 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{formatDate(call.date || call.callDate)}</td>
+                  <td className={`px-6 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{call.agent}</td>
+                  <td className="px-6 py-4">
+                    <a 
+                      href={`tel:${call.callingNo}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="group flex items-center gap-2 text-sm"
+                    >
+                      <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'} group-hover:text-teal transition-colors`}>
+                        {call.callingNo || 'N/A'}
+                      </span>
+                      {call.callingNo && (
+                        <motion.div
+                          whileHover={{ scale: 1.2 }}
+                          whileTap={{ scale: 0.9 }}
+                          className="p-1.5 rounded-full bg-teal/10 text-teal opacity-0 group-hover:opacity-100 transition-all"
+                          title="Call Now"
+                        >
+                          <Phone className="w-3 h-3" />
+                        </motion.div>
+                      )}
+                    </a>
+                  </td>
+                  <td className={`px-6 py-4 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{call.city}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-start gap-2 max-w-[280px]">
                       <FileText className="w-4 h-4 text-teal flex-shrink-0 mt-0.5" />
-                      <span className="text-xs text-gray-600 leading-relaxed line-clamp-2" title={generateIssueSummary(call.callType, call.riskLevel)}>
+                      <span className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} title={generateIssueSummary(call.callType, call.riskLevel)}>
                         {generateIssueSummary(call.callType, call.riskLevel)}
                       </span>
                     </div>
@@ -313,12 +537,12 @@ const LiveCallMonitoring = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${getSentimentColor(call.sentiment)}`}></div>
-                      <span className="text-sm capitalize text-gray-700">{call.sentiment}</span>
+                      <span className={`text-sm capitalize ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{call.sentiment}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[60px]">
+                      <div className={`flex-1 rounded-full h-2 max-w-[60px] ${isDarkMode ? 'bg-slate-700' : 'bg-gray-200'}`}>
                         <div
                           className={`h-2 rounded-full ${
                             (call.qaScore || call.sopAdherence) >= 80 ? 'bg-teal' : 
@@ -327,14 +551,14 @@ const LiveCallMonitoring = () => {
                           style={{ width: `${call.qaScore || call.sopAdherence}%` }}
                         ></div>
                       </div>
-                      <span className="text-sm font-semibold text-gray-700">{call.qaScore || call.sopAdherence}%</span>
+                      <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{call.qaScore || call.sopAdherence}%</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant={call.riskLevel}>{call.riskLevel?.toUpperCase() || 'LOW'}</Badge>
                   </td>
                   <td className="px-6 py-4">
-                    <Button size="sm" variant="ghost">View Details</Button>
+                    <Button size="sm" variant="ghost" className={isDarkMode ? 'text-gray-300 hover:bg-slate-700' : ''}>View Details</Button>
                   </td>
                 </motion.tr>
               ))}
