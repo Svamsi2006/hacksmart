@@ -1,15 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Lock, Fingerprint, CheckCircle, XCircle, Zap } from 'lucide-react';
+import { Shield, Lock, CheckCircle, XCircle, Zap } from 'lucide-react';
 
 const LoginScreen = ({ onLogin }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [success, setSuccess] = useState(false);
   const [shake, setShake] = useState(false);
+  const inputRef = useRef(null);
   
-  // The secret PIN - Battery Smart themed: 2026 (current year)
-  const CORRECT_PIN = '2026';
+  // The secret PIN
+  const CORRECT_PIN = '1111';
+  
+  // Focus input on mount for keyboard typing
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+  
+  // Handle keyboard input
+  const handleKeyDown = (e) => {
+    if (success) return;
+    
+    if (e.key >= '0' && e.key <= '9') {
+      handlePinInput(e.key);
+    } else if (e.key === 'Backspace') {
+      handleBackspace();
+    } else if (e.key === 'Escape') {
+      handleClear();
+    }
+  };
   
   const handlePinInput = (digit) => {
     if (pin.length < 4) {
@@ -120,7 +139,7 @@ const LoginScreen = ({ onLogin }) => {
         <p className="text-teal text-sm">Battery Smart Intelligence</p>
       </motion.div>
 
-      {/* Lock Icon */}
+      {/* Battery Logo Icon */}
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
@@ -143,10 +162,26 @@ const LoginScreen = ({ onLogin }) => {
               <CheckCircle className="w-10 h-10 text-teal" />
             </motion.div>
           ) : (
-            <Fingerprint className="w-10 h-10 text-teal" />
+            <motion.img
+              src="/battery-smart-logo.svg"
+              alt="Battery Smart"
+              className="w-12 h-12"
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
           )}
         </motion.div>
       </motion.div>
+      
+      {/* Hidden input for keyboard typing */}
+      <input
+        ref={inputRef}
+        type="text"
+        className="opacity-0 absolute w-0 h-0"
+        onKeyDown={handleKeyDown}
+        onBlur={() => inputRef.current?.focus()}
+        autoFocus
+      />
 
       {/* PIN Display */}
       <motion.div
