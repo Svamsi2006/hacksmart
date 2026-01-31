@@ -7,7 +7,6 @@ import LiveCallMonitoring from './components/pages/LiveCallMonitoring';
 import QAAnalytics from './components/pages/QAAnalytics';
 import RevenueLeakage from './components/pages/RevenueLeakage';
 import AgentCoaching from './components/pages/AgentCoaching';
-import CityInsights from './components/pages/CityInsights';
 import SupervisorAlerts from './components/pages/SupervisorAlerts';
 import DataLoadingOverlay from './components/shared/DataLoadingOverlay';
 import LoadingScreen from './components/shared/LoadingScreen';
@@ -36,8 +35,6 @@ function App() {
         return <RevenueLeakage />;
       case 'agent-coaching':
         return <AgentCoaching />;
-      case 'city-insights':
-        return <CityInsights />;
       case 'supervisor-alerts':
         return <SupervisorAlerts />;
       default:

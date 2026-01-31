@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { DollarSign, TrendingDown, AlertCircle, X, Play, Pause, Download, Volume2, VolumeX, SkipBack, SkipForward, RotateCcw, Loader2, FileAudio, Brain, AlertTriangle } from 'lucide-react';
 import Card from '../shared/Card';
 import Badge from '../shared/Badge';
@@ -7,6 +7,7 @@ import Button from '../shared/Button';
 import BarChart from '../charts/BarChart';
 import { useData } from '../../context/DataContext';
 import { sopChecklist, escalationMatrix } from '../../data/sopData';
+import { calculateRealKPIs, generateIssueSummary, formatIndianCurrency } from '../../services/analyticsService';
 
 // Helper function to get direct audio URL from Google Drive
 const getDirectAudioUrl = (driveUrl) => {
@@ -115,68 +116,71 @@ const RevenueLeakage = () => {
     setSelectedCall(fullCall);
   };
 
-  // Calculate real revenue leakage based on call data and SOP
+  // Calculate REAL KPIs from actual call data
+  const realKPIs = useMemo(() => calculateRealKPIs(calls), [calls]);
+
+  // Calculate ACCURATE revenue leakage based on REAL call data
   const calculateLeakage = () => {
-    const categories = [
-      { type: 'Missed Upsells', amount: 0, percentage: 0, description: 'Agent didn\'t mention premium plans or upgrades' },
-      { type: 'Incorrect Compensation', amount: 0, percentage: 0, description: 'Over-compensation beyond L1 authority (>₹50)' },
-      { type: 'Resolution Delays', amount: 0, percentage: 0, description: 'TAT exceeded, customer churn risk' },
-      { type: 'SOP Violations', amount: 0, percentage: 0, description: 'Critical steps skipped causing repeat calls' }
-    ];
+    // Count actual risk distribution from real data
+    const highRiskCalls = calls.filter(c => c.riskLevel === 'high');
+    const mediumRiskCalls = calls.filter(c => c.riskLevel === 'medium');
+    
+    // Leakage calculation based on real risk data:
+    // High-risk: ₹1,500 per call (major issue that could cause churn)
+    // Medium-risk: ₹300 per call (potential SOP deviation)
+    const highRiskLeakage = highRiskCalls.length * 1500;  // 7 × ₹1,500 = ₹10,500
+    const mediumRiskLeakage = mediumRiskCalls.length * 300; // 60 × ₹300 = ₹18,000
+    const total = highRiskLeakage + mediumRiskLeakage; // ₹28,500
 
-    // Calculate based on actual calls
+    // Group by call type for category breakdown
+    const issueGroups = {};
     calls.forEach(call => {
-      // Missed upsells - if QA score < 85 and no upsell attempt
-      if ((call.qaScore || 0) < 85) {
-        categories[0].amount += 150; // ₹150 per missed upsell opportunity
-      }
-      
-      // Resolution delays - if high risk
-      if (call.riskLevel === 'high') {
-        categories[2].amount += 500; // ₹500 per high-risk delay
-      }
-      
-      // SOP violations - based on adherence score
-      if ((call.sopAdherence || 0) < 70) {
-        categories[3].amount += 200; // ₹200 per major SOP violation
+      if (call.riskLevel === 'high' || call.riskLevel === 'medium') {
+        const issue = call.callType || 'Other';
+        if (!issueGroups[issue]) {
+          issueGroups[issue] = { count: 0, amount: 0 };
+        }
+        issueGroups[issue].count++;
+        issueGroups[issue].amount += call.riskLevel === 'high' ? 1500 : 300;
       }
     });
 
-    // Add some base amounts for demonstration
-    categories[0].amount += 45000; // Base missed upsells
-    categories[1].amount = 12000; // Fixed incorrect compensation estimate
-    categories[2].amount += 18000; // Base delays
-    categories[3].amount += 8000; // Base SOP violations
+    const categories = Object.entries(issueGroups)
+      .map(([type, data]) => ({
+        type,
+        amount: data.amount,
+        count: data.count,
+        percentage: total > 0 ? Math.round((data.amount / total) * 100) : 0,
+        description: generateIssueSummary(type, 'high')
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 6); // Top 6 categories
 
-    const total = categories.reduce((sum, cat) => sum + cat.amount, 0);
-    categories.forEach(cat => {
-      cat.percentage = Math.round((cat.amount / total) * 100);
-    });
-
-    return { total, categories };
+    return { total, categories, highRiskLeakage, mediumRiskLeakage };
   };
 
   const leakageData = calculateLeakage();
 
-  // Generate alerts from real calls
+  // Generate alerts from REAL high-risk calls
   const generateAlerts = () => {
     return calls
-      .filter(call => call.riskLevel === 'high' || (call.sopAdherence || 0) < 70)
-      .slice(0, 5)
+      .filter(call => call.riskLevel === 'high')
       .map(call => ({
         id: call.id,
         callId: call.id,
         agent: call.agent,
-        issue: call.callType || 'SOP Violation Detected',
-        severity: call.riskLevel === 'high' ? 'high' : 'medium',
-        potentialLoss: call.riskLevel === 'high' ? 2500 : 1000,
-        time: call.callDate
+        issue: call.callType || 'High-Risk Issue Detected',
+        severity: 'high',
+        potentialLoss: 1500, // Consistent with our calculation
+        time: call.callDate,
+        city: call.city,
+        issueSummary: generateIssueSummary(call.callType, call.riskLevel)
       }));
   };
 
   const revenueAlerts = generateAlerts();
 
-  // City breakdown from real data
+  // City breakdown from REAL call data
   const cityBreakdown = () => {
     const cities = {};
     calls.forEach(call => {
@@ -184,23 +188,20 @@ const RevenueLeakage = () => {
       if (!cities[city]) {
         cities[city] = { city, amount: 0, cases: 0 };
       }
-      if (call.riskLevel === 'high' || (call.sopAdherence || 0) < 70) {
+      
+      // Only count leakage for high and medium risk calls
+      if (call.riskLevel === 'high') {
         cities[city].amount += 1500;
+        cities[city].cases += 1;
+      } else if (call.riskLevel === 'medium') {
+        cities[city].amount += 300;
         cities[city].cases += 1;
       }
     });
     
-    // Add default cities if no data
-    if (Object.keys(cities).length === 0) {
-      return [
-        { city: 'Delhi NCR', amount: 35000, cases: 23 },
-        { city: 'Bangalore', amount: 28000, cases: 18 },
-        { city: 'Pune', amount: 15000, cases: 12 },
-        { city: 'Hyderabad', amount: 12000, cases: 8 }
-      ];
-    }
-    
-    return Object.values(cities);
+    return Object.values(cities)
+      .filter(c => c.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
   };
 
   const formatCurrency = (amount) => {
@@ -229,19 +230,20 @@ const RevenueLeakage = () => {
             </div>
             <span className="text-sm font-semibold text-gray-600">Total Leakage</span>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">₹{(leakageData.total / 1000).toFixed(1)}K</p>
+          <p className="text-3xl font-bold text-navy mb-2">{formatIndianCurrency(leakageData.total)}</p>
           <p className="text-xs text-gray-600">Detected from {calls.length} calls analyzed</p>
+          <p className="text-xs text-gray-500 mt-1">High: ₹{leakageData.highRiskLeakage?.toLocaleString()} | Med: ₹{leakageData.mediumRiskLeakage?.toLocaleString()}</p>
         </Card>
 
         <Card className="p-6 bg-gradient-to-br from-amber/10 to-amber/5 border-amber/20">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-amber/20 rounded-xl">
-              <DollarSign className="w-6 h-6 text-amber" />
+              <AlertTriangle className="w-6 h-6 text-amber" />
             </div>
-            <span className="text-sm font-semibold text-gray-600">Missed Upsells</span>
+            <span className="text-sm font-semibold text-gray-600">High-Risk Leakage</span>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">₹{(leakageData.categories[0].amount / 1000).toFixed(1)}K</p>
-          <p className="text-xs text-gray-600">{leakageData.categories[0].percentage}% of total leakage</p>
+          <p className="text-3xl font-bold text-navy mb-2">{formatIndianCurrency(leakageData.highRiskLeakage || 0)}</p>
+          <p className="text-xs text-gray-600">{realKPIs.highRiskCalls} high-risk calls × ₹1,500</p>
         </Card>
 
         <Card className="p-6 bg-gradient-to-br from-teal/10 to-teal/5 border-teal/20">
@@ -251,8 +253,8 @@ const RevenueLeakage = () => {
             </div>
             <span className="text-sm font-semibold text-gray-600">Cases Identified</span>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">{cityBreakdown().reduce((sum, city) => sum + city.cases, 0)}</p>
-          <p className="text-xs text-gray-600">Across all cities</p>
+          <p className="text-3xl font-bold text-navy mb-2">{realKPIs.highRiskCalls + realKPIs.mediumRiskCalls}</p>
+          <p className="text-xs text-gray-600">{realKPIs.highRiskCalls} high + {realKPIs.mediumRiskCalls} medium risk</p>
         </Card>
       </div>
 
@@ -329,7 +331,8 @@ const RevenueLeakage = () => {
 
       {/* Recent Alerts */}
       <Card className="p-6">
-        <h3 className="text-lg font-bold text-navy mb-6">Recent Revenue Alerts</h3>
+        <h3 className="text-lg font-bold text-navy mb-2">Recent Revenue Alerts</h3>
+        <p className="text-xs text-gray-500 mb-6">Showing all {revenueAlerts.length} high-risk calls with potential revenue impact</p>
         {revenueAlerts.length > 0 ? (
         <div className="space-y-4">
           {revenueAlerts.map((alert, index) => (
@@ -349,12 +352,17 @@ const RevenueLeakage = () => {
                   <div className="flex items-center gap-3 mb-2">
                     <Badge variant={alert.severity}>{alert.severity.toUpperCase()}</Badge>
                     <span className="text-xs text-gray-500">{alert.callId}</span>
+                    {alert.city && <span className="text-xs text-gray-400">• {alert.city}</span>}
                   </div>
                   <p className="text-sm font-semibold text-navy mb-1">{alert.issue}</p>
                   <p className="text-xs text-gray-600">Agent: {alert.agent}</p>
+                  {/* Issue Summary */}
+                  <p className="text-xs text-purple-700 mt-2 bg-purple-50 p-2 rounded italic">
+                    💡 {alert.issueSummary}
+                  </p>
                 </div>
                 <div className="text-right ml-4">
-                  <p className="text-xl font-bold text-danger">{formatCurrency(alert.potentialLoss)}</p>
+                  <p className="text-xl font-bold text-danger">₹{alert.potentialLoss.toLocaleString()}</p>
                   <p className="text-xs text-gray-500">Potential Loss</p>
                 </div>
               </div>
@@ -367,7 +375,9 @@ const RevenueLeakage = () => {
         </div>
         ) : (
           <div className="text-center py-8 text-gray-500">
-            <p>No revenue alerts detected. All calls are within acceptable parameters.</p>
+            <AlertCircle className="w-12 h-12 mx-auto mb-3 text-teal" />
+            <p className="font-medium">No high-risk revenue alerts detected!</p>
+            <p className="text-sm mt-1">All {calls.length} calls are within acceptable parameters.</p>
           </div>
         )}
       </Card>

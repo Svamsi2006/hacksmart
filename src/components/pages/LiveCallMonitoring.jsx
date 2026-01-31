@@ -635,6 +635,18 @@ const LiveCallMonitoring = () => {
                       exit={{ opacity: 0, y: -10 }}
                       className="space-y-4"
                     >
+                      {/* Issue Summary - One Line */}
+                      <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl border-2 border-purple-200">
+                        <p className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          🎯 Issue Summary (Why Customer Called)
+                        </p>
+                        <p className="text-base font-medium text-purple-900">
+                          {generateIssueSummary(selectedCall.callType, selectedCall.riskLevel)}
+                        </p>
+                        <p className="text-xs text-purple-600 mt-2">Call Type: {selectedCall.callType || 'General Inquiry'}</p>
+                      </div>
+
                       {/* AI Summary */}
                       <div>
                         <p className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-2">

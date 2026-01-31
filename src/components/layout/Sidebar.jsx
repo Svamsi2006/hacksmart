@@ -5,7 +5,6 @@ import {
   BarChart3, 
   TrendingDown, 
   GraduationCap, 
-  MapPin, 
   AlertTriangle,
   X
 } from 'lucide-react';
@@ -17,7 +16,6 @@ const Sidebar = ({ activePage, setActivePage, isMobile = false, onClose }) => {
     { id: 'qa-analytics', label: 'QA Analytics', icon: BarChart3 },
     { id: 'revenue-leakage', label: 'Revenue Leakage', icon: TrendingDown },
     { id: 'agent-coaching', label: 'Agent Coaching', icon: GraduationCap },
-    { id: 'city-insights', label: 'City Insights', icon: MapPin },
     { id: 'supervisor-alerts', label: 'Supervisor Alerts', icon: AlertTriangle },
   ];
 
