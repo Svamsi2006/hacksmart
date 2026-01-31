@@ -1,0 +1,318 @@
+import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { Phone, TrendingUp, AlertTriangle, DollarSign, RefreshCw, Cloud, Database, Key, CheckCircle, XCircle } from 'lucide-react';
+import KPICard from '../shared/KPICard';
+import Card from '../shared/Card';
+import Button from '../shared/Button';
+import LineChart from '../charts/LineChart';
+import BarChart from '../charts/BarChart';
+import DonutChart from '../charts/DonutChart';
+import { useData } from '../../context/DataContext';
+import { kpiData as fallbackKpi, dailyTrend, callQuality, sentimentData } from '../../data/mockData';
+
+const Overview = ({ setActivePage }) => {
+  const { 
+    analytics, 
+    calls,
+    loading, 
+    analyzing,
+    dataSource, 
+    lastUpdated, 
+    analyzeAllAudio,
+    fetchFromGoogleSheets,
+    getHighRiskCalls
+  } = useData();
+
+  // API Key state
+  const [apiKey, setApiKey] = useState(localStorage.getItem('deepgram_api_key') || '');
+  const [apiKeyStatus, setApiKeyStatus] = useState(localStorage.getItem('deepgram_api_key') ? 'saved' : 'empty');
+  const [showApiInput, setShowApiInput] = useState(!localStorage.getItem('deepgram_api_key'));
+
+  // Handle API key submission
+  const handleApiKeySubmit = () => {
+    if (apiKey.trim()) {
+      localStorage.setItem('deepgram_api_key', apiKey.trim());
+      setApiKeyStatus('saved');
+      setShowApiInput(false);
+      // Update the transcription service dynamically
+      window.DEEPGRAM_API_KEY = apiKey.trim();
+    }
+  };
+
+  const handleApiKeyReset = () => {
+    setShowApiInput(true);
+    setApiKeyStatus('empty');
+  };
+
+  // Use real analytics if available, otherwise fallback
+  const kpiData = analytics?.kpis || fallbackKpi;
+  const chartData = analytics?.charts || { dailyTrend, callQuality, sentimentData };
+  const highRiskCalls = getHighRiskCalls();
+
+  // Navigate to Supervisor Alerts when clicking high-risk
+  const handleHighRiskClick = () => {
+    if (setActivePage) {
+      setActivePage('supervisor-alerts');
+    }
+  };
+
+  // Dynamic insights based on real data
+  const generateInsights = () => {
+    const positiveCount = calls.filter(c => c.sentiment === 'positive').length;
+    const negativeCount = calls.filter(c => c.sentiment === 'negative').length;
+    const positivePercent = calls.length > 0 ? Math.round((positiveCount / calls.length) * 100) : 62;
+    const avgQA = calls.length > 0 
+      ? Math.round(calls.reduce((sum, c) => sum + (c.qaScore || 0), 0) / calls.length)
+      : 78;
+
+    return [
+      {
+        color: 'teal',
+        title: `${avgQA}% QA Score Achievement`,
+        description: `Across ${calls.length} analyzed calls. ${dataSource === 'live' ? 'Live data from Google Sheets.' : 'Demo data displayed.'}`
+      },
+      {
+        color: 'amber',
+        title: `${highRiskCalls.length} High-Risk Calls Detected`,
+        description: `Most common: ID verification skipped, resolution mismatch.`
+      },
+      {
+        color: 'danger',
+        title: `₹${kpiData.revenueSaved || '3.4'}L Revenue Saved`,
+        description: 'Prevented leakage through real-time coaching and SOP adherence monitoring.'
+      },
+      {
+        color: 'blue',
+        title: `${positivePercent}% Positive Sentiment`,
+        description: `${negativeCount} negative calls require attention for improvement.`
+      }
+    ];
+  };
+
+  const insights = generateInsights();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
+      {/* Deepgram API Key Input - Highlighted Section */}
+      <motion.div
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border-2 border-purple-500/30"
+      >
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-500/20 rounded-lg">
+              <Key className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="font-bold text-navy flex items-center gap-2">
+                Deepgram API Key
+                {apiKeyStatus === 'saved' && (
+                  <span className="flex items-center gap-1 text-xs text-teal font-normal">
+                    <CheckCircle className="w-3 h-3" /> Active
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-gray-600">
+                Enter your Deepgram API key for audio transcription
+              </p>
+            </div>
+          </div>
+          
+          {showApiInput ? (
+            <div className="flex items-center gap-2 flex-1 max-w-md">
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Enter Deepgram API Key..."
+                className="flex-1 px-4 py-2 border border-purple-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleApiKeySubmit}
+                className="bg-purple-600 hover:bg-purple-700 whitespace-nowrap"
+              >
+                Activate Key
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 bg-white/50 px-3 py-1 rounded">
+                ••••••••{apiKey.slice(-4)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleApiKeyReset}
+                className="text-purple-600 border-purple-300"
+              >
+                Change Key
+              </Button>
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Data Source Banner */}
+      <motion.div
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className={`flex items-center justify-between p-4 rounded-xl ${
+          dataSource === 'live' ? 'bg-teal/10 border border-teal/30' : 'bg-amber/10 border border-amber/30'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          {dataSource === 'live' ? (
+            <Cloud className="w-5 h-5 text-teal" />
+          ) : (
+            <Database className="w-5 h-5 text-amber" />
+          )}
+          <div>
+            <p className="font-semibold text-navy">
+              {dataSource === 'live' ? 'Live Data Connected' : 'Demo Data Mode'}
+            </p>
+            <p className="text-xs text-gray-600">
+              {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : 'Using sample data'}
+              {' • '}{calls.length} calls loaded
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={analyzeAllAudio}
+            disabled={analyzing || calls.length === 0}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Analyzing...' : 'Re-Analyze All'}
+          </Button>
+          <Button 
+            variant="primary" 
+            size="sm"
+            onClick={() => fetchFromGoogleSheets()}
+            disabled={loading}
+          >
+            <Cloud className="w-4 h-4 mr-2" />
+            Fetch Live Data
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KPICard
+          title="Total Calls Audited Today"
+          value={calls.length || kpiData.totalCalls}
+          icon={Phone}
+          trend={kpiData.trend?.calls || 12.5}
+          helper="Across all cities"
+        />
+        <KPICard
+          title="Average QA Score"
+          value={analytics?.avgQAScore || kpiData.avgQAScore}
+          icon={TrendingUp}
+          trend={kpiData.trend?.qaScore || 2.3}
+          suffix="%"
+          helper="Company-wide average"
+        />
+        <motion.div 
+          whileHover={{ scale: 1.02 }} 
+          whileTap={{ scale: 0.98 }}
+          onClick={handleHighRiskClick}
+          className="cursor-pointer"
+        >
+          <KPICard
+            title="High-Risk Calls Flagged"
+            value={highRiskCalls.length || kpiData.highRiskCalls}
+            icon={AlertTriangle}
+            trend={kpiData.trend?.risk || -5.2}
+            helper="Click to view alerts →"
+            className="ring-2 ring-danger/30 hover:ring-danger/50 transition-all"
+          />
+        </motion.div>
+        <KPICard
+          title="Estimated Revenue Saved"
+          value={kpiData.revenueSaved || '3.4L'}
+          icon={DollarSign}
+          trend={kpiData.trend?.revenue || 8.7}
+          prefix="₹"
+          helper="From leakage prevention"
+        />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Line Chart */}
+        <Card className="p-6">
+          <LineChart
+            data={chartData.dailyTrend || dailyTrend}
+            dataKey="score"
+            xKey="date"
+            title="Daily QA Score Trend (Last 14 Days)"
+          />
+        </Card>
+
+        {/* Bar Chart */}
+        <Card className="p-6">
+          <BarChart
+            data={chartData.callQuality || callQuality}
+            xKey="category"
+            title="Call Quality Breakdown"
+          />
+        </Card>
+      </div>
+
+      {/* Donut Chart + Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <DonutChart
+            data={chartData.sentimentData || sentimentData}
+            title="Call Sentiment Distribution"
+          />
+        </Card>
+
+        {/* Key Insights */}
+        <Card className="p-6">
+          <h3 className="text-lg font-bold text-navy mb-4">Key Insights</h3>
+          <div className="space-y-4">
+            {insights.map((insight, idx) => (
+              <motion.div 
+                key={idx}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className={`flex items-start gap-3 p-4 rounded-lg border ${
+                  insight.color === 'teal' ? 'bg-teal/5 border-teal/20' :
+                  insight.color === 'amber' ? 'bg-amber/5 border-amber/20' :
+                  insight.color === 'danger' ? 'bg-danger/5 border-danger/20' :
+                  'bg-blue-50 border-blue-200'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full mt-2 ${
+                  insight.color === 'teal' ? 'bg-teal' :
+                  insight.color === 'amber' ? 'bg-amber' :
+                  insight.color === 'danger' ? 'bg-danger' :
+                  'bg-blue-500'
+                }`}></div>
+                <div>
+                  <p className="text-sm font-semibold text-navy">{insight.title}</p>
+                  <p className="text-xs text-gray-600 mt-1">{insight.description}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </motion.div>
+  );
+};
+
+export default Overview;

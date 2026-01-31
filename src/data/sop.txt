@@ -1,0 +1,239 @@
+BATTERY SMART PRIVATE LIMITED
+STANDARD OPERATING PROCEDURES
+Customer Care & Field Operations - Version 2.0
+
+DOCUMENT CLASSIFICATION: INTERNAL - RESTRICTED
+ 
+DOCUMENT CONTROL
+Field	Value
+Document ID	BS-SOP-OPS-2026-001
+Version	2.0 (OPERATIONAL REVISION - REPLACES V1.0)
+Effective Date	February 1, 2026
+Supersedes	BS-SOP-CC-001 v1.0 (REJECTED FOR OPERATIONAL USE)
+Department	Customer Care, Field Operations, Quality Assurance
+Review Frequency	Monthly for 90 days, then Quarterly
+Document Owner	Head of Operations
+
+CRITICAL: WHY VERSION 1.0 WAS REJECTED
+Version 1.0 was not approved for operational use. Deficiencies identified:
+
+
+•	❌ Generic call center procedures - not specific to battery swapping
+•	❌ No execution-level steps - agents could not follow on Day 1
+•	❌ Repetitive content across all 10 SOPs (same roles/TATs copied)
+•	❌ Missing compensation approval limits - risk of unauthorized refunds
+•	❌ Safety procedures had no emergency scripts or exact actions
+•	❌ Unrealistic TATs (e.g., "≤ 5 minutes" for complex troubleshooting)
+•	❌ No DO/DON'T rules - agents unsure what they can/cannot do
+•	❌ Missing decision matrices - too much agent judgment required
+
+Version 2.0 addresses all deficiencies with floor-executable procedures.
+
+ 
+DEFINITIONS - BATTERY SWAPPING SPECIFIC
+Term	Definition
+Swap	Complete battery exchange (depleted OUT, charged IN)
+Slot	Individual battery storage compartment at station
+SOC	State of Charge (0-100%). Acceptable = ≥80%
+Low SOC	Battery < 80% charge at pickup
+Swap Failure	Customer unable to swap due to station/battery issue
+Ghost Swap	System records swap but battery not received
+Stuck Battery	Battery locked, unable to remove
+Downtime	Period driver unable to earn due to our service failure
+Churn Risk	Customer indicating cancellation intent
+L1/L2/L3	Agent / Supervisor / Manager escalation levels
+ 
+SOP 1: SWAP STATION FAILURE RESOLUTION
+SOP ID: BS-SOP-001-R2 | Priority: CRITICAL
+
+PURPOSE
+Resolve station failures immediately to minimize driver downtime. This is the #1 complaint category affecting customer satisfaction and revenue.
+SCOPE
+•	No batteries available (inventory out)
+•	Low SOC batteries (<80% charge)
+•	Slot malfunction (door stuck, won't open)
+•	Station offline/unreachable
+•	QR code scan failure
+•	Battery stuck in slot or vehicle
+PROCEDURE - STEP BY STEP
+STEP 1: IMMEDIATE DATA COLLECTION (< 30 SECONDS)
+
+
+Agent MUST ask in this exact order:
+
+•	1. "Which station are you at?" → Verify station ID in system
+•	2. "What happened when you tried to swap?" → Identify issue type
+•	3. "What time did this happen?" → Check against swap logs
+•	4. (If battery involved) "What's the battery number?" → Note serial
+•	5. Pull up station dashboard WHILE customer speaks (don't ask them to hold)
+
+DO: Navigate system while listening
+DON'T: Put customer on hold to search for information
+
+
+STEP 2: CLASSIFY & ACT (USE DECISION MATRIX)
+
+
+Issue	L1 Action	TAT	Escalate If
+No batteries available	Check nearest station with inventory → Direct customer	< 2 min	None within 3km
+Low SOC (60-79%)	Offer: Accept battery + ₹30 credit OR go to alt station	< 3 min	SOC < 60%
+Low SOC (< 60%)	Must escalate to L2 for ₹50 credit approval	< 5 min	Auto-escalate
+Slot stuck/won't open	Remote unlock attempt → Manual reset guide	< 5 min	Unlock fails
+Station offline	Direct to alt station + log outage	< 2 min	Outage > 30min
+QR scan fails	Generate manual swap code	< 2 min	3+ failures
+
+STEP 3: STUCK BATTERY - EXACT CUSTOMER INSTRUCTIONS
+
+
+If battery stuck in VEHICLE:
+
+•	Instruct: "Turn your vehicle completely OFF - not just stopped, turn the key OFF"
+•	Instruct: "Put the kickstand DOWN all the way"
+•	Instruct: "Press and HOLD the red battery release button for 5 full seconds"
+•	Instruct: "While holding, pull the battery handle UP firmly"
+•	If 2 attempts fail: "I'm dispatching our team. DO NOT force it. ETA 20 minutes."
+
+If battery stuck in STATION SLOT:
+
+•	Check system: Slot showing "Occupied" or "Available"?
+•	If "Occupied": Attempt remote unlock
+•	If unlock succeeds: Guide customer to retry
+•	If unlock fails: Dispatch field tech (TAT 30 min) + provide alt station
+
+STEP 4: COMPENSATION (STRICT APPROVAL LIMITS)
+
+
+Scenario	Compensation	Authority	Notes
+No batteries at station	₹20 credit OR 10km bonus	Auto-approved (L1)	None
+Low SOC 60-79%	₹30 credit	Auto-approved (L1)	None
+Low SOC < 60%	₹50 credit	L2 approval REQUIRED	Get approval first
+Stuck battery + delay > 15min	₹100 credit + 1 free swap	L2 approval REQUIRED	Get approval first
+Station offline → trip cancelled	Case-by-case	L3 ONLY	Immediate escalate
+
+CRITICAL RULE: Agent CANNOT promise > ₹50 without L2 approval. Violation = written warning.
+
+
+DOCUMENTATION REQUIREMENTS
+Every ticket MUST have (incomplete = rejected):
+•	Station ID (verified in system)
+•	Issue type (from matrix)
+•	Timestamp (when it happened, not when they called)
+•	Action taken (what you did)
+•	Compensation issued (exact amount)
+•	Alternative station provided (if yes, which one)
+•	Customer sentiment (Calm/Frustrated/Angry)
+KPIs - MEASURED DAILY
+Metric	Target	Miss Consequence
+Average Resolution Time	< 4 minutes	Daily coaching if missed
+First Call Resolution	≥ 85%	Performance review
+Incorrect compensation	< 2%	Written warning
+Incomplete tickets	< 5%	Ticket returned to agent
+ 
+SOP 2: PAYMENT FAILURE & REFUND PROCESSING
+SOP ID: BS-SOP-002-R2
+
+PURPOSE
+Resolve payment failures and process refunds with strict financial controls. Unauthorized refunds result in HR escalation.
+SCOPE
+•	Payment gateway failures (Razorpay/Paytm/PhonePe)
+•	Double charging / Ghost transactions
+•	Refund requests (service failure, cancellation)
+•	Auto-debit failures
+PAYMENT FAILURE RESOLUTION
+STEP 1: VERIFY PAYMENT STATUS
+
+Required info: Transaction ID, Amount, Payment method, Date/time
+Check system: Is it "Success," "Failed," or "Pending"?
+
+
+STEP 2: CLASSIFY & ACT
+
+
+Issue	L1 Action	TAT	Escalate
+Failed + service blocked	Retry with alternate method	< 5 min	None
+Success but service not active	Manual activation + flag for refund audit	< 10 min	None
+Double charged	ESCALATE TO L2 IMMEDIATELY	Immediate	All cases
+Amount incorrect	ESCALATE TO L2 IMMEDIATELY	Immediate	All cases
+Pending > 24 hours	Check gateway → Cancel/retry	< 15 min	Still pending after action
+
+CRITICAL: L1 agents CANNOT process refunds. ALL refund requests → Escalate to L2.
+
+
+REFUND APPROVAL MATRIX (L2/L3 ONLY)
+Refund Reason	Authority	Processing Time	Documentation
+Duplicate charge	L2 Supervisor	3-5 business days	Both transaction IDs
+Ghost swap (not received)	L2 Supervisor	3-5 business days	Swap logs + station camera
+Incorrect billing	L2 Supervisor	3-5 business days	Invoice + receipt
+Subscription cancel (< 7 days)	L2 Supervisor	5-7 business days	Cancellation request
+Subscription cancel (> 7 days)	L3 Manager	7-10 business days	Usage logs + justification
+Service quality complaint	L3 Manager	Case-by-case	Evidence + supervisor review
+
+DO: Tell customer: "Refunds take 5-7 business days to reflect in your account"
+DON'T: Promise immediate refund or same-day processing
+ 
+SOP 3: SAFETY & EMERGENCY RESPONSE
+SOP ID: BS-SOP-003-R2 | Priority: EMERGENCY
+
+PURPOSE
+This SOP SUPERSEDES all others when safety is at risk.
+
+EMERGENCY TYPES
+Type	Indicators	Response Time
+LEVEL 1: Fire/Smoke	Flames, smoke, burning smell	IMMEDIATE (< 60 sec)
+LEVEL 2: Severe Overheating	Too hot to touch, swelling	IMMEDIATE (< 2 min)
+LEVEL 3: Injury/Accident	Person injured	IMMEDIATE (< 60 sec)
+LEVEL 4: Battery Leaking	Liquid/gel visible	URGENT (< 5 min)
+LEVEL 1: FIRE/SMOKE - EXACT SCRIPT
+EMERGENCY SCRIPT (SAY EXACTLY):
+
+
+"This is an emergency. Please move away from the battery IMMEDIATELY - at least 10 meters. Do NOT touch it. Do NOT move it. Do NOT pour water on it. Are you safe now?"
+
+IMMEDIATE ACTIONS:
+
+•	1. Press RED emergency alert button in CRM (top-right)
+•	2. System auto-dispatches: Fire safety team + Field manager + City ops
+•	3. Note EXACT location
+•	4. Collect: Battery ID, location details, people nearby, fire spreading?
+•	5. STAY ON CALL until help arrives or L3 takes over
+
+DO: Keep customer calm, confirm safety
+DON'T: Give fire-fighting advice
+DON'T: End call before help arrives
+LEVEL 3: INJURY - EXACT SCRIPT
+SCRIPT:
+
+"I understand you are injured. Have you called an ambulance? [If no] Please call 108 immediately. [If yes] Our manager will call you within 30 minutes. Your ticket number is [ID]."
+
+CRITICAL: Do NOT discuss liability. Do NOT promise compensation. Escalate to L3 + Legal immediately.
+ 
+ESCALATION MATRIX - ALL ISSUES
+Category	L1	L2	L3	Max TAT
+Station failures	Direct to alt station	Field tech dispatch	Station closure	30 min
+Payment/Refund	Payment retry	Refund < ₹500	Refund > ₹500	24 hrs
+Safety emergency	Emergency alert	Safety dispatch	Incident mgmt	Immediate
+Compensation	Up to ₹50	₹51-500	> ₹500	N/A
+Churn risk	Immediate escalate	Retention offer	Final decision	4 hrs
+ 
+ASSUMPTIONS & MISSING INFORMATION
+The following were assumed due to missing data:
+
+
+•	Emergency team availability: 24/7 (needs confirmation)
+•	Field technician zones: Urban response times only
+•	Payment gateway refund SLA: Standard 3-5 days
+•	Compensation monthly budget: No cap specified
+•	Battery inventory "low" threshold: Not defined
+•	Customer blacklist criteria: Not specified
+•	Legal liaison process: Assumed to exist but not documented
+
+RECOMMENDATION: Update within 30 days with confirmed operational parameters.
+
+ 
+REVISION HISTORY
+Version	Date	Changes	Status
+1.0	Jan 31, 2026	Initial (REJECTED)	Not operational
+2.0	Jan 31, 2026	Operational revision	Pending approval
+
+Next Review: March 1, 2026 (30-day validation)
+

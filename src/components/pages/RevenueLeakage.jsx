@@ -1,0 +1,599 @@
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useRef, useEffect } from 'react';
+import { DollarSign, TrendingDown, AlertCircle, X, Play, Pause, Download, Volume2, VolumeX, SkipBack, SkipForward, RotateCcw, Loader2, FileAudio, Brain, AlertTriangle } from 'lucide-react';
+import Card from '../shared/Card';
+import Badge from '../shared/Badge';
+import Button from '../shared/Button';
+import BarChart from '../charts/BarChart';
+import { useData } from '../../context/DataContext';
+import { sopChecklist, escalationMatrix } from '../../data/sopData';
+
+// Helper function to get direct audio URL from Google Drive
+const getDirectAudioUrl = (driveUrl) => {
+  if (!driveUrl) return null;
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+    /[?&]id=([a-zA-Z0-9_-]+)/,
+    /\/d\/([a-zA-Z0-9_-]+)/,
+  ];
+  for (const pattern of patterns) {
+    const match = driveUrl.match(pattern);
+    if (match) {
+      return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+    }
+  }
+  return driveUrl;
+};
+
+const RevenueLeakage = () => {
+  const { calls } = useData();
+  const [selectedCall, setSelectedCall] = useState(null);
+  
+  // Audio player state
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [audioError, setAudioError] = useState(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+
+  // Audio player functions
+  const formatTime = (time) => {
+    if (isNaN(time)) return '0:00';
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(e => {
+          setAudioError('Unable to play audio. The file may not be accessible.');
+        });
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+      setAudioLoading(false);
+    }
+  };
+
+  const handleSeek = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const percentage = (e.clientX - rect.left) / rect.width;
+    if (audioRef.current) {
+      audioRef.current.currentTime = percentage * duration;
+    }
+  };
+
+  const toggleMute = () => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 1 : 0;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const skipTime = (seconds) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = Math.max(0, Math.min(duration, currentTime + seconds));
+    }
+  };
+
+  const restartAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      setCurrentTime(0);
+    }
+  };
+
+  // Reset audio when call changes
+  useEffect(() => {
+    if (selectedCall) {
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      setAudioError(null);
+      setAudioLoading(true);
+    }
+  }, [selectedCall?.id]);
+
+  const handleReviewCall = (alert) => {
+    // Find the full call data from calls array
+    const fullCall = calls.find(c => c.id === alert.callId) || alert;
+    setSelectedCall(fullCall);
+  };
+
+  // Calculate real revenue leakage based on call data and SOP
+  const calculateLeakage = () => {
+    const categories = [
+      { type: 'Missed Upsells', amount: 0, percentage: 0, description: 'Agent didn\'t mention premium plans or upgrades' },
+      { type: 'Incorrect Compensation', amount: 0, percentage: 0, description: 'Over-compensation beyond L1 authority (>₹50)' },
+      { type: 'Resolution Delays', amount: 0, percentage: 0, description: 'TAT exceeded, customer churn risk' },
+      { type: 'SOP Violations', amount: 0, percentage: 0, description: 'Critical steps skipped causing repeat calls' }
+    ];
+
+    // Calculate based on actual calls
+    calls.forEach(call => {
+      // Missed upsells - if QA score < 85 and no upsell attempt
+      if ((call.qaScore || 0) < 85) {
+        categories[0].amount += 150; // ₹150 per missed upsell opportunity
+      }
+      
+      // Resolution delays - if high risk
+      if (call.riskLevel === 'high') {
+        categories[2].amount += 500; // ₹500 per high-risk delay
+      }
+      
+      // SOP violations - based on adherence score
+      if ((call.sopAdherence || 0) < 70) {
+        categories[3].amount += 200; // ₹200 per major SOP violation
+      }
+    });
+
+    // Add some base amounts for demonstration
+    categories[0].amount += 45000; // Base missed upsells
+    categories[1].amount = 12000; // Fixed incorrect compensation estimate
+    categories[2].amount += 18000; // Base delays
+    categories[3].amount += 8000; // Base SOP violations
+
+    const total = categories.reduce((sum, cat) => sum + cat.amount, 0);
+    categories.forEach(cat => {
+      cat.percentage = Math.round((cat.amount / total) * 100);
+    });
+
+    return { total, categories };
+  };
+
+  const leakageData = calculateLeakage();
+
+  // Generate alerts from real calls
+  const generateAlerts = () => {
+    return calls
+      .filter(call => call.riskLevel === 'high' || (call.sopAdherence || 0) < 70)
+      .slice(0, 5)
+      .map(call => ({
+        id: call.id,
+        callId: call.id,
+        agent: call.agent,
+        issue: call.callType || 'SOP Violation Detected',
+        severity: call.riskLevel === 'high' ? 'high' : 'medium',
+        potentialLoss: call.riskLevel === 'high' ? 2500 : 1000,
+        time: call.callDate
+      }));
+  };
+
+  const revenueAlerts = generateAlerts();
+
+  // City breakdown from real data
+  const cityBreakdown = () => {
+    const cities = {};
+    calls.forEach(call => {
+      const city = call.city || 'Unknown';
+      if (!cities[city]) {
+        cities[city] = { city, amount: 0, cases: 0 };
+      }
+      if (call.riskLevel === 'high' || (call.sopAdherence || 0) < 70) {
+        cities[city].amount += 1500;
+        cities[city].cases += 1;
+      }
+    });
+    
+    // Add default cities if no data
+    if (Object.keys(cities).length === 0) {
+      return [
+        { city: 'Delhi NCR', amount: 35000, cases: 23 },
+        { city: 'Bangalore', amount: 28000, cases: 18 },
+        { city: 'Pune', amount: 15000, cases: 12 },
+        { city: 'Hyderabad', amount: 12000, cases: 8 }
+      ];
+    }
+    
+    return Object.values(cities);
+  };
+
+  const formatCurrency = (amount) => {
+    return `₹${(amount / 1000).toFixed(1)}K`;
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-navy">Revenue Leakage Radar</h2>
+        <p className="text-sm text-gray-600 mt-1">Identifying and preventing revenue loss opportunities</p>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="p-6 bg-gradient-to-br from-danger/10 to-danger/5 border-danger/20">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-danger/20 rounded-xl">
+              <TrendingDown className="w-6 h-6 text-danger" />
+            </div>
+            <span className="text-sm font-semibold text-gray-600">Total Leakage</span>
+          </div>
+          <p className="text-3xl font-bold text-navy mb-2">₹{(leakageData.total / 1000).toFixed(1)}K</p>
+          <p className="text-xs text-gray-600">Detected from {calls.length} calls analyzed</p>
+        </Card>
+
+        <Card className="p-6 bg-gradient-to-br from-amber/10 to-amber/5 border-amber/20">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-amber/20 rounded-xl">
+              <DollarSign className="w-6 h-6 text-amber" />
+            </div>
+            <span className="text-sm font-semibold text-gray-600">Missed Upsells</span>
+          </div>
+          <p className="text-3xl font-bold text-navy mb-2">₹{(leakageData.categories[0].amount / 1000).toFixed(1)}K</p>
+          <p className="text-xs text-gray-600">{leakageData.categories[0].percentage}% of total leakage</p>
+        </Card>
+
+        <Card className="p-6 bg-gradient-to-br from-teal/10 to-teal/5 border-teal/20">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-teal/20 rounded-xl">
+              <AlertCircle className="w-6 h-6 text-teal" />
+            </div>
+            <span className="text-sm font-semibold text-gray-600">Cases Identified</span>
+          </div>
+          <p className="text-3xl font-bold text-navy mb-2">{cityBreakdown().reduce((sum, city) => sum + city.cases, 0)}</p>
+          <p className="text-xs text-gray-600">Across all cities</p>
+        </Card>
+      </div>
+
+      {/* Charts and Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* City-wise Leakage */}
+        <Card className="p-6">
+          <h3 className="text-lg font-bold text-navy mb-6">Revenue Leakage by City</h3>
+          <BarChart
+            data={cityBreakdown()}
+            xKey="city"
+            dataKeys={['amount']}
+          />
+        </Card>
+
+        {/* Category Breakdown */}
+        <Card className="p-6">
+          <h3 className="text-lg font-bold text-navy mb-6">Leakage Categories</h3>
+          <div className="space-y-4">
+            {leakageData.categories.map((category, index) => (
+              <motion.div
+                key={category.type}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="p-4 bg-gray-50 rounded-lg"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-navy">{category.type}</span>
+                  <span className="text-lg font-bold text-danger">{formatCurrency(category.amount)}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full bg-danger"
+                    style={{ width: `${category.percentage}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">{category.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* SOP Reference - Compensation Limits */}
+      <Card className="p-6">
+        <h3 className="text-lg font-bold text-navy mb-4">SOP Compensation Limits (Reference)</h3>
+        <p className="text-xs text-gray-500 mb-4">Per BS-SOP-001-R2 & BS-SOP-002-R2 - Unauthorized compensation causes revenue leakage</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Scenario</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Max Compensation</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Authority</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {sopChecklist.swapStation.steps[3].approvalLimits.map((limit, idx) => (
+                <tr key={idx} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-700">{limit.scenario}</td>
+                  <td className="px-4 py-3 font-medium text-navy">{limit.compensation}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant={limit.authority.includes('L1') ? 'low' : limit.authority.includes('L2') ? 'medium' : 'high'}>
+                      {limit.authority}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Recent Alerts */}
+      <Card className="p-6">
+        <h3 className="text-lg font-bold text-navy mb-6">Recent Revenue Alerts</h3>
+        {revenueAlerts.length > 0 ? (
+        <div className="space-y-4">
+          {revenueAlerts.map((alert, index) => (
+            <motion.div
+              key={alert.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className={`p-5 rounded-lg border-2 ${
+                alert.severity === 'high' 
+                  ? 'bg-danger/5 border-danger/30' 
+                  : 'bg-amber/5 border-amber/30'
+              }`}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Badge variant={alert.severity}>{alert.severity.toUpperCase()}</Badge>
+                    <span className="text-xs text-gray-500">{alert.callId}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-navy mb-1">{alert.issue}</p>
+                  <p className="text-xs text-gray-600">Agent: {alert.agent}</p>
+                </div>
+                <div className="text-right ml-4">
+                  <p className="text-xl font-bold text-danger">{formatCurrency(alert.potentialLoss)}</p>
+                  <p className="text-xs text-gray-500">Potential Loss</p>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-4">
+                <Button size="sm" variant="danger" className="flex-1" onClick={() => handleReviewCall(alert)}>Review Call</Button>
+                <Button size="sm" variant="outline" className="flex-1">Send Coaching</Button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <p>No revenue alerts detected. All calls are within acceptable parameters.</p>
+          </div>
+        )}
+      </Card>
+
+      {/* Call Review Slide-in Panel */}
+      <AnimatePresence>
+        {selectedCall && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+              onClick={() => setSelectedCall(null)}
+            />
+            
+            {/* Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed top-0 right-0 h-full w-[480px] bg-white shadow-2xl z-50 overflow-hidden"
+            >
+              <div className="h-full flex flex-col">
+                {/* Panel Header */}
+                <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-navy/5 to-teal/5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                        <FileAudio className="w-4 h-4" />
+                        <span>{selectedCall.id}</span>
+                        <span>•</span>
+                        <span>{selectedCall.duration || '5:30'}</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-navy">{selectedCall.agent}</h3>
+                      <p className="text-sm text-gray-600">{selectedCall.city || 'Unknown City'} • {selectedCall.callType || 'Inbound'}</p>
+                    </div>
+                    <button onClick={() => setSelectedCall(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                      <X className="w-5 h-5 text-gray-600" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6 overflow-y-auto flex-1">
+                  {/* Audio Player */}
+                  <div className="bg-gradient-to-r from-navy/5 to-teal/5 rounded-xl p-4">
+                    <audio
+                      ref={audioRef}
+                      src={getDirectAudioUrl(selectedCall.audioUrl)}
+                      onTimeUpdate={handleTimeUpdate}
+                      onLoadedMetadata={handleLoadedMetadata}
+                      onError={() => { setAudioError('Unable to load audio'); setAudioLoading(false); }}
+                      onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
+                      onCanPlay={() => setAudioLoading(false)}
+                      preload="metadata"
+                    />
+                    
+                    {audioError ? (
+                      <div className="text-center py-2">
+                        <p className="text-sm text-amber-600 mb-3">{audioError}</p>
+                        <a 
+                          href={selectedCall.audioUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-teal text-white rounded-lg hover:bg-teal/90 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                          Open in Google Drive
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={togglePlay}
+                          disabled={audioLoading}
+                          className="w-14 h-14 bg-teal rounded-full flex items-center justify-center hover:bg-teal/90 transition-colors shadow-lg disabled:opacity-50"
+                        >
+                          {audioLoading ? (
+                            <Loader2 className="w-6 h-6 text-white animate-spin" />
+                          ) : isPlaying ? (
+                            <Pause className="w-6 h-6 text-white" />
+                          ) : (
+                            <Play className="w-6 h-6 text-white ml-1" />
+                          )}
+                        </button>
+
+                        <div className="flex-1">
+                          <div 
+                            className="h-2 bg-gray-200 rounded-full overflow-hidden cursor-pointer"
+                            onClick={handleSeek}
+                          >
+                            <div 
+                              className="h-2 bg-teal rounded-full transition-all duration-100"
+                              style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between mt-2 text-xs text-gray-500">
+                            <span>{formatTime(currentTime)}</span>
+                            <span className="font-medium">{formatTime(duration) || selectedCall.duration || '0:00'}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => skipTime(-10)} className="p-2 hover:bg-white rounded-lg transition-colors" title="Rewind 10s">
+                            <SkipBack className="w-4 h-4 text-gray-600" />
+                          </button>
+                          <button onClick={restartAudio} className="p-2 hover:bg-white rounded-lg transition-colors" title="Restart">
+                            <RotateCcw className="w-4 h-4 text-gray-600" />
+                          </button>
+                          <button onClick={() => skipTime(10)} className="p-2 hover:bg-white rounded-lg transition-colors" title="Forward 10s">
+                            <SkipForward className="w-4 h-4 text-gray-600" />
+                          </button>
+                          <button onClick={toggleMute} className="p-2 hover:bg-white rounded-lg transition-colors" title={isMuted ? 'Unmute' : 'Mute'}>
+                            {isMuted ? <VolumeX className="w-4 h-4 text-gray-600" /> : <Volume2 className="w-4 h-4 text-gray-600" />}
+                          </button>
+                          <a href={selectedCall.audioUrl} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-white rounded-lg transition-colors" title="Download">
+                            <Download className="w-4 h-4 text-gray-600" />
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Call Info Grid */}
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                      <p className="text-xl font-bold text-navy">{selectedCall.qaScore || selectedCall.sopAdherence}%</p>
+                      <p className="text-xs text-gray-500">QA Score</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                      <p className="text-xl font-bold text-navy">{selectedCall.sopAdherence}%</p>
+                      <p className="text-xs text-gray-500">SOP</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                      <Badge variant={selectedCall.sentiment} className="text-xs">
+                        {selectedCall.sentiment?.toUpperCase() || 'NEUTRAL'}
+                      </Badge>
+                      <p className="text-xs text-gray-500 mt-1">Sentiment</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                      <Badge variant={selectedCall.riskLevel} className="text-xs">
+                        {selectedCall.riskLevel?.toUpperCase() || 'HIGH'}
+                      </Badge>
+                      <p className="text-xs text-gray-500 mt-1">Risk</p>
+                    </div>
+                  </div>
+
+                  {/* Call Details */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-700">Call Details</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-500">Customer Number</p>
+                        <p className="font-medium text-navy">{selectedCall.callingNo || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Call Date</p>
+                        <p className="font-medium text-navy">{selectedCall.callDate || 'Today'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">City</p>
+                        <p className="font-medium text-navy">{selectedCall.city || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Duration</p>
+                        <p className="font-medium text-navy">{selectedCall.duration || '5:30'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Revenue Impact */}
+                  <div className="bg-danger/5 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-danger mb-3 flex items-center gap-2">
+                      <TrendingDown className="w-4 h-4" />
+                      Revenue Impact Assessment
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-500">Estimated Loss</p>
+                        <p className="font-bold text-danger text-lg">₹{selectedCall.riskLevel === 'high' ? '2,500' : '1,000'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Issue Type</p>
+                        <p className="font-medium text-navy">{selectedCall.callType || 'SOP Violation'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Summary */}
+                  {selectedCall.summary && (
+                    <div className="bg-teal/5 rounded-xl p-4">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-teal" />
+                        AI Analysis Summary
+                      </h4>
+                      <p className="text-sm text-gray-600 leading-relaxed">{selectedCall.summary}</p>
+                    </div>
+                  )}
+
+                  {/* Issues Found */}
+                  {selectedCall.issues && selectedCall.issues.length > 0 && (
+                    <div className="bg-amber/5 rounded-xl p-4">
+                      <h4 className="text-sm font-semibold text-amber mb-2 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Issues Detected
+                      </h4>
+                      <ul className="space-y-2">
+                        {selectedCall.issues.map((issue, idx) => (
+                          <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                            <span className="text-amber">•</span>
+                            {issue}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+export default RevenueLeakage;
