@@ -17,7 +17,7 @@ const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
   const dateRanges = ['All Time', '1/29/26', '1/28/26'];
 
   return (
-    <nav className={`${isDarkMode ? 'bg-slate-900/80 backdrop-blur-xl border-slate-800' : 'bg-white/80 backdrop-blur-xl border-gray-200'} border-b px-4 md:px-6 py-3 md:py-4 fixed top-0 left-0 right-0 z-50 transition-colors duration-300`}>
+    <nav className={`${isDarkMode ? 'bg-[#0d0f1a]/95 backdrop-blur-xl border-purple-500/20' : 'bg-white/80 backdrop-blur-xl border-gray-200'} border-b px-4 md:px-6 py-3 md:py-4 fixed top-0 left-0 right-0 z-50 transition-colors duration-300`}>
       <div className="flex items-center justify-between">
         {/* Left Section - Menu + Logo */}
         <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
               onChange={(e) => setSelectedCity(e.target.value)}
               className={`appearance-none border rounded-lg px-4 py-2 pr-10 text-sm font-medium cursor-pointer transition-colors ${
                 isDarkMode 
-                  ? 'bg-slate-800 border-slate-700 text-gray-300 hover:bg-slate-700' 
+                  ? 'bg-purple-900/30 border-purple-500/30 text-gray-300 hover:bg-purple-900/50' 
                   : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -93,7 +93,7 @@ const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
               onChange={(e) => setSelectedDateRange(e.target.value)}
               className={`appearance-none border rounded-lg px-4 py-2 pr-10 pl-10 text-sm font-medium cursor-pointer transition-colors ${
                 isDarkMode 
-                  ? 'bg-slate-800 border-slate-700 text-gray-300 hover:bg-slate-700' 
+                  ? 'bg-purple-900/30 border-purple-500/30 text-gray-300 hover:bg-purple-900/50' 
                   : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -121,10 +121,10 @@ const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowLogoutMenu(!showLogoutMenu)}
               className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 rounded-lg cursor-pointer ${
-                isDarkMode ? 'bg-teal/20' : 'bg-teal/10'
+                isDarkMode ? 'bg-cyan-500/20' : 'bg-teal/10'
               }`}
             >
-              <User className="w-5 h-5 text-teal" />
+              <User className={`w-5 h-5 ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`} />
               <span className={`hidden sm:block text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-navy'}`}>Supervisor</span>
               <ChevronDown className={`w-4 h-4 hidden sm:block ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
             </motion.div>
@@ -136,7 +136,7 @@ const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
                 animate={{ opacity: 1, y: 0 }}
                 className={`absolute right-0 top-12 rounded-lg shadow-lg overflow-hidden z-50 ${
                   isDarkMode 
-                    ? 'bg-slate-800/95 backdrop-blur-xl border border-slate-700' 
+                    ? 'bg-[#0d0f1a]/95 backdrop-blur-xl border border-purple-500/30' 
                     : 'bg-white border border-gray-200'
                 }`}
               >

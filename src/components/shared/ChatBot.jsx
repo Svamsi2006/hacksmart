@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Bot, User, Sparkles, Loader2, Minimize2, Maximize2 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useTheme } from '../../context/ThemeContext';
 import { calculateRealKPIs, generateIssueSummary } from '../../services/analyticsService';
 
 const ChatBot = () => {
@@ -11,7 +12,7 @@ const ChatBot = () => {
     {
       id: 1,
       type: 'bot',
-      text: "👋 Hi! I'm Smart-Audit AI Assistant. I can help you understand the dashboard data, explain metrics, and answer questions about calls, agents, and revenue. What would you like to know?",
+      text: "👋 Hi! I'm Smart-Audit AI Assistant. Ask me about any data - agents, phone numbers, calls, revenue, or say 'help' for all options!",
       time: new Date()
     }
   ]);
@@ -19,6 +20,7 @@ const ChatBot = () => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const { calls } = useData();
+  const { isDarkMode } = useTheme();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,6 +50,52 @@ const ChatBot = () => {
     const q = query.toLowerCase();
     const stats = getStats();
     const { kpis, highRiskCalls, agents, cities, callTypes, topIssue } = stats;
+
+    // Phone number questions - search by agent name
+    if (q.includes('phone') || q.includes('number') || q.includes('contact') || q.includes('call')) {
+      // Extract name from query
+      const words = q.split(/\s+/);
+      const nameKeywords = words.filter(w => !['phone', 'number', 'of', 'for', 'the', 'what', 'is', 'contact', 'call', 'no', 'give', 'me', 'show', 'get', "'s", 'whats'].includes(w));
+      
+      if (nameKeywords.length > 0) {
+        const searchName = nameKeywords.join(' ');
+        const matchingCalls = calls.filter(call => 
+          call.agent?.toLowerCase().includes(searchName) ||
+          call.callingNo?.includes(searchName)
+        );
+        
+        if (matchingCalls.length > 0) {
+          const uniqueNumbers = [...new Set(matchingCalls.map(c => c.callingNo).filter(Boolean))];
+          const agentName = matchingCalls[0].agent;
+          const callDetails = matchingCalls.slice(0, 3).map(c => 
+            `• ${c.callingNo} - ${c.city} (${c.callType})`
+          ).join('\n');
+          
+          return `📞 **Contact Info for ${agentName}:**\n\n${callDetails}\n\n**Total Calls:** ${matchingCalls.length} calls from this agent\n**Cities:** ${[...new Set(matchingCalls.map(c => c.city))].join(', ')}`;
+        }
+      }
+      
+      // If no specific name, show general phone data
+      const phoneData = calls.filter(c => c.callingNo).slice(0, 5);
+      if (phoneData.length > 0) {
+        const phoneList = phoneData.map(c => `• ${c.agent}: ${c.callingNo} (${c.city})`).join('\n');
+        return `📞 **Recent Call Numbers:**\n\n${phoneList}\n\nAsk for a specific agent like "phone number of Divya" to get their contact info.`;
+      }
+    }
+
+    // Agent-specific data questions
+    const agentNames = [...new Set(calls.map(c => c.agent?.toLowerCase()).filter(Boolean))];
+    const matchedAgent = agentNames.find(name => q.includes(name));
+    
+    if (matchedAgent) {
+      const agentCalls = calls.filter(c => c.agent?.toLowerCase() === matchedAgent);
+      const agent = agentCalls[0];
+      const avgQA = Math.round(agentCalls.reduce((sum, c) => sum + (c.qaScore || 0), 0) / agentCalls.length);
+      const phoneNumbers = [...new Set(agentCalls.map(c => c.callingNo).filter(Boolean))];
+      const agentCities = [...new Set(agentCalls.map(c => c.city).filter(Boolean))];
+      
+      return `👤 **Agent: ${agent.agent}**\n\n• **Total Calls:** ${agentCalls.length}\n• **Average QA Score:** ${avgQA}%\n• **Phone Numbers:** ${phoneNumbers.slice(0, 3).join(', ') || 'N/A'}\n• **Cities:** ${agentCities.join(', ')}\n• **Call Types:** ${[...new Set(agentCalls.map(c => c.callType))].slice(0, 3).join(', ')}\n\n📞 To call: ${phoneNumbers[0] || 'No number available'}`;
+    }
 
     // Overview questions
     if (q.includes('overview') || q.includes('summary') || q.includes('dashboard')) {
@@ -109,11 +157,11 @@ const ChatBot = () => {
 
     // Help questions
     if (q.includes('help') || q.includes('what can you') || q.includes('how to')) {
-      return `🤖 **I can help you with:**\n\n• 📊 Dashboard overview & metrics\n• 💰 Revenue analysis & leakage\n• 🚨 High-risk call alerts\n• 👥 Agent performance\n• 📈 QA score insights\n• 🏙️ City-wise data\n• 📞 Call type analysis\n• 📋 SOP adherence info\n\nJust ask me anything about the dashboard!`;
+      return `🤖 **I can help you with:**\n\n• � **Phone numbers** - "phone no of Divya"\n• 👤 **Agent info** - "tell me about Jyoti"\n• 📊 Dashboard overview & metrics\n• 💰 Revenue analysis & leakage\n• 🚨 High-risk call alerts\n• 📈 QA score insights\n• 🏙️ City-wise data\n• 📋 SOP adherence info\n\nJust ask me anything about the dashboard data!`;
     }
 
     // Default response
-    return `I understand you're asking about "${query}". Here's what I found:\n\n• **Total Calls:** ${kpis.totalCalls}\n• **QA Score:** ${kpis.avgQAScore}%\n• **High-Risk:** ${kpis.highRiskCalls} alerts\n\nTry asking about:\n- "Show me the overview"\n- "What's the revenue saved?"\n- "How many high-risk calls?"\n- "Agent performance"\n- "Call type breakdown"`;
+    return `I understand you're asking about "${query}". Here's what I found:\n\n• **Total Calls:** ${kpis.totalCalls}\n• **QA Score:** ${kpis.avgQAScore}%\n• **High-Risk:** ${kpis.highRiskCalls} alerts\n\n**Try asking:**\n- "Phone number of Divya"\n- "Tell me about Jyoti"\n- "Show me the overview"\n- "What's the revenue saved?"\n- "How many high-risk calls?"`;
   };
 
   const handleSend = () => {
@@ -163,8 +211,12 @@ const ChatBot = () => {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 bg-gradient-to-br from-teal to-emerald-600 rounded-full shadow-lg flex items-center justify-center text-white"
-            style={{ boxShadow: '0 4px 20px rgba(0,230,118,0.4)' }}
+            className={`fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white ${
+              isDarkMode 
+                ? 'bg-gradient-to-br from-cyan-500 to-purple-600' 
+                : 'bg-gradient-to-br from-teal to-emerald-600'
+            }`}
+            style={{ boxShadow: isDarkMode ? '0 4px 20px rgba(139,92,246,0.4)' : '0 4px 20px rgba(0,230,118,0.4)' }}
           >
             <motion.div
               animate={{ rotate: [0, 10, -10, 0] }}
@@ -192,19 +244,29 @@ const ChatBot = () => {
               height: isMinimized ? '60px' : '500px'
             }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 w-[calc(100vw-32px)] md:w-[400px] bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200"
+            className={`fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 w-[calc(100vw-32px)] md:w-[400px] rounded-2xl shadow-2xl overflow-hidden ${
+              isDarkMode 
+                ? 'bg-[#0d0f1a] border border-purple-500/30' 
+                : 'bg-white border border-gray-200'
+            }`}
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-navy to-navy/90 p-4 flex items-center justify-between">
+            <div className={`p-4 flex items-center justify-between ${
+              isDarkMode 
+                ? 'bg-gradient-to-r from-purple-900/80 to-[#0d0f1a]' 
+                : 'bg-gradient-to-r from-navy to-navy/90'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-teal/20 flex items-center justify-center">
-                  <Bot className="w-5 h-5 text-teal" />
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  isDarkMode ? 'bg-cyan-500/20' : 'bg-teal/20'
+                }`}>
+                  <Bot className={`w-5 h-5 ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`} />
                 </div>
                 <div>
                   <h3 className="text-white font-semibold text-sm">Smart-Audit Assistant</h3>
                   <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 bg-teal rounded-full animate-pulse"></span>
-                    <span className="text-teal text-xs">Online</span>
+                    <span className={`w-2 h-2 rounded-full animate-pulse ${isDarkMode ? 'bg-cyan-400' : 'bg-teal'}`}></span>
+                    <span className={`text-xs ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`}>Online</span>
                   </div>
                 </div>
               </div>
@@ -231,7 +293,7 @@ const ChatBot = () => {
             {/* Messages */}
             {!isMinimized && (
               <>
-                <div className="h-[360px] overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <div className={`h-[360px] overflow-y-auto p-4 space-y-4 ${isDarkMode ? 'bg-[#0a0c15]' : 'bg-gray-50'}`}>
                   {messages.map((msg) => (
                     <motion.div
                       key={msg.id}
@@ -240,17 +302,19 @@ const ChatBot = () => {
                       className={`flex gap-3 ${msg.type === 'user' ? 'flex-row-reverse' : ''}`}
                     >
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        msg.type === 'user' ? 'bg-teal text-white' : 'bg-navy text-white'
+                        msg.type === 'user' 
+                          ? (isDarkMode ? 'bg-cyan-500 text-white' : 'bg-teal text-white')
+                          : (isDarkMode ? 'bg-purple-600 text-white' : 'bg-navy text-white')
                       }`}>
                         {msg.type === 'user' ? <User className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                       </div>
                       <div className={`max-w-[75%] p-3 rounded-2xl text-sm ${
                         msg.type === 'user' 
-                          ? 'bg-teal text-white rounded-tr-sm' 
-                          : 'bg-white border border-gray-200 text-gray-700 rounded-tl-sm shadow-sm'
+                          ? (isDarkMode ? 'bg-cyan-500 text-white rounded-tr-sm' : 'bg-teal text-white rounded-tr-sm')
+                          : (isDarkMode ? 'bg-purple-900/50 border border-purple-500/30 text-gray-200 rounded-tl-sm' : 'bg-white border border-gray-200 text-gray-700 rounded-tl-sm shadow-sm')
                       }`}>
                         <p className="whitespace-pre-wrap">{msg.text}</p>
-                        <p className={`text-[10px] mt-1 ${msg.type === 'user' ? 'text-teal-100' : 'text-gray-400'}`}>
+                        <p className={`text-[10px] mt-1 ${msg.type === 'user' ? (isDarkMode ? 'text-cyan-100' : 'text-teal-100') : (isDarkMode ? 'text-gray-500' : 'text-gray-400')}`}>
                           {msg.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
@@ -264,25 +328,25 @@ const ChatBot = () => {
                       animate={{ opacity: 1 }}
                       className="flex gap-3"
                     >
-                      <div className="w-8 h-8 rounded-full bg-navy text-white flex items-center justify-center">
+                      <div className={`w-8 h-8 rounded-full text-white flex items-center justify-center ${isDarkMode ? 'bg-purple-600' : 'bg-navy'}`}>
                         <Sparkles className="w-4 h-4" />
                       </div>
-                      <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-tl-sm shadow-sm">
+                      <div className={`p-3 rounded-2xl rounded-tl-sm ${isDarkMode ? 'bg-purple-900/50 border border-purple-500/30' : 'bg-white border border-gray-200 shadow-sm'}`}>
                         <div className="flex gap-1">
                           <motion.span
                             animate={{ y: [0, -5, 0] }}
                             transition={{ duration: 0.5, repeat: Infinity, delay: 0 }}
-                            className="w-2 h-2 bg-gray-400 rounded-full"
+                            className={`w-2 h-2 rounded-full ${isDarkMode ? 'bg-cyan-400' : 'bg-gray-400'}`}
                           />
                           <motion.span
                             animate={{ y: [0, -5, 0] }}
                             transition={{ duration: 0.5, repeat: Infinity, delay: 0.1 }}
-                            className="w-2 h-2 bg-gray-400 rounded-full"
+                            className={`w-2 h-2 rounded-full ${isDarkMode ? 'bg-purple-400' : 'bg-gray-400'}`}
                           />
                           <motion.span
                             animate={{ y: [0, -5, 0] }}
                             transition={{ duration: 0.5, repeat: Infinity, delay: 0.2 }}
-                            className="w-2 h-2 bg-gray-400 rounded-full"
+                            className={`w-2 h-2 rounded-full ${isDarkMode ? 'bg-cyan-400' : 'bg-gray-400'}`}
                           />
                         </div>
                       </div>
@@ -292,22 +356,28 @@ const ChatBot = () => {
                 </div>
 
                 {/* Input */}
-                <div className="p-4 border-t border-gray-200 bg-white">
+                <div className={`p-4 border-t ${isDarkMode ? 'border-purple-500/30 bg-[#0d0f1a]' : 'border-gray-200 bg-white'}`}>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      placeholder="Ask about calls, revenue, agents..."
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent"
+                      placeholder="Ask about phone numbers, agents..."
+                      className={`flex-1 px-4 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 ${
+                        isDarkMode 
+                          ? 'bg-purple-900/30 border-purple-500/30 text-white placeholder-gray-500 focus:ring-cyan-500' 
+                          : 'border-gray-300 focus:ring-teal focus:border-transparent'
+                      }`}
                     />
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={handleSend}
                       disabled={!input.trim()}
-                      className="w-10 h-10 bg-teal rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isDarkMode ? 'bg-gradient-to-r from-cyan-500 to-purple-600' : 'bg-teal'
+                      }`}
                     >
                       <Send className="w-4 h-4" />
                     </motion.button>

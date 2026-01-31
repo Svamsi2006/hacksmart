@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
+import { useTheme } from '../../context/ThemeContext';
 
 const Card = ({ children, className = '', animate = true, hover = false }) => {
+  const { isDarkMode } = useTheme();
   const Component = animate ? motion.div : 'div';
   
   return (
@@ -11,9 +13,13 @@ const Card = ({ children, className = '', animate = true, hover = false }) => {
         transition: { duration: 0.3 }
       })}
       {...(hover && {
-        whileHover: { y: -2, boxShadow: '0 8px 25px rgba(0,0,0,0.1)' }
+        whileHover: { y: -2, boxShadow: isDarkMode ? '0 8px 25px rgba(139,92,246,0.15)' : '0 8px 25px rgba(0,0,0,0.1)' }
       })}
-      className={`bg-white rounded-xl md:rounded-card shadow-sm border border-gray-100 transition-shadow ${className}`}
+      className={`rounded-xl md:rounded-card shadow-sm transition-all duration-300 ${
+        isDarkMode 
+          ? 'bg-[#0d0f1a]/80 border border-purple-500/20' 
+          : 'bg-white border border-gray-100'
+      } ${className}`}
     >
       {children}
     </Component>

@@ -30,7 +30,7 @@ const Layout = ({ children, activePage, setActivePage, onLogout }) => {
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-background'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-[#0a0c15]' : 'bg-background'}`}>
       <Navbar 
         currentPage={pageNames[activePage]} 
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}

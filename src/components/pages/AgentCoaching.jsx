@@ -1,13 +1,15 @@
 import { motion } from 'framer-motion';
-import { GraduationCap, MessageSquare, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { GraduationCap, MessageSquare, TrendingUp, AlertTriangle, CheckCircle, Filter } from 'lucide-react';
 import Card from '../shared/Card';
 import Badge from '../shared/Badge';
 import Button from '../shared/Button';
 import { useData } from '../../context/DataContext';
+import { useTheme } from '../../context/ThemeContext';
 import { agentEvaluationChecklist, sopChecklist, issueToSopMapping } from '../../data/sopData';
 
 const AgentCoaching = () => {
   const { calls } = useData();
+  const { isDarkMode } = useTheme();
 
   // Generate agent coaching data from real calls
   const generateAgentData = () => {
@@ -103,11 +105,16 @@ const AgentCoaching = () => {
     return nudges.slice(0, 2);
   };
 
-  const agentsData = generateAgentData();
+  const allAgentsData = generateAgentData();
+  
+  // Filter to show only agents who need training (low SOP adherence < 80% or needs-attention status)
+  const agentsData = allAgentsData.filter(agent => 
+    agent.sopScore < 80 || agent.status === 'needs-attention'
+  );
   
   // Calculate overall stats
   const totalNudges = agentsData.reduce((sum, a) => sum + a.recentNudges.length, 0);
-  const improvingAgents = agentsData.filter(a => a.status === 'high-performer' || a.status === 'improving').length;
+  const improvingAgents = allAgentsData.filter(a => a.status === 'high-performer' || a.status === 'improving').length;
   const topTheme = agentsData.flatMap(a => a.coachingThemes)[0] || 'SOP Compliance';
 
   return (
@@ -118,9 +125,17 @@ const AgentCoaching = () => {
       className="space-y-6"
     >
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-navy">Agent Coaching Panel</h2>
-        <p className="text-sm text-gray-600 mt-1">AI-powered personalized coaching based on SOP v2.0 and real call data</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-navy'}`}>Agent Coaching Panel</h2>
+          <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>AI-powered personalized coaching based on SOP v2.0 and real call data</p>
+        </div>
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${isDarkMode ? 'bg-cyan-500/10 border border-cyan-500/30' : 'bg-amber/10 border border-amber/30'}`}>
+          <Filter className={`w-4 h-4 ${isDarkMode ? 'text-cyan-400' : 'text-amber'}`} />
+          <span className={`text-sm font-medium ${isDarkMode ? 'text-cyan-400' : 'text-amber'}`}>
+            Showing {agentsData.length} agents needing training (SOP &lt; 80%)
+          </span>
+        </div>
       </div>
 
       {/* Agent Cards Grid */}
@@ -132,15 +147,15 @@ const AgentCoaching = () => {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card className="p-6 hover:shadow-lg transition-shadow">
+            <Card className={`p-6 transition-shadow ${isDarkMode ? 'bg-[#0d0f1a]/80 border border-purple-500/20 hover:border-cyan-500/40' : 'hover:shadow-lg'}`}>
               {/* Agent Header */}
-              <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
-                <div className="w-16 h-16 bg-gradient-to-br from-teal to-navy text-white rounded-full flex items-center justify-center text-xl font-bold">
+              <div className={`flex items-center gap-4 mb-6 pb-6 border-b ${isDarkMode ? 'border-purple-500/20' : 'border-gray-200'}`}>
+                <div className={`w-16 h-16 text-white rounded-full flex items-center justify-center text-xl font-bold ${isDarkMode ? 'bg-gradient-to-br from-cyan-500 to-purple-600' : 'bg-gradient-to-br from-teal to-navy'}`}>
                   {agent.avatar}
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-navy">{agent.name}</h3>
-                  <p className="text-xs text-gray-500">{agent.calls} calls analyzed</p>
+                  <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-navy'}`}>{agent.name}</h3>
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{agent.calls} calls analyzed</p>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant={agent.status}>
                       {agent.status === 'high-performer' ? 'High Performer' :
@@ -149,22 +164,22 @@ const AgentCoaching = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-teal">{agent.qaScore}%</p>
-                  <p className="text-xs text-gray-500">QA Score</p>
+                  <p className={`text-3xl font-bold ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`}>{agent.qaScore}%</p>
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>QA Score</p>
                 </div>
               </div>
 
               {/* SOP Adherence */}
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">SOP Adherence</span>
-                  <span className={`text-sm font-bold ${agent.sopScore >= 80 ? 'text-teal' : agent.sopScore >= 60 ? 'text-amber' : 'text-danger'}`}>
+                  <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>SOP Adherence</span>
+                  <span className={`text-sm font-bold ${agent.sopScore >= 80 ? (isDarkMode ? 'text-cyan-400' : 'text-teal') : agent.sopScore >= 60 ? 'text-amber' : 'text-danger'}`}>
                     {agent.sopScore}%
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-purple-900/50' : 'bg-gray-200'}`}>
                   <div 
-                    className={`h-2 rounded-full ${agent.sopScore >= 80 ? 'bg-teal' : agent.sopScore >= 60 ? 'bg-amber' : 'bg-danger'}`}
+                    className={`h-2 rounded-full ${agent.sopScore >= 80 ? (isDarkMode ? 'bg-cyan-400' : 'bg-teal') : agent.sopScore >= 60 ? 'bg-amber' : 'bg-danger'}`}
                     style={{ width: `${agent.sopScore}%` }}
                   ></div>
                 </div>
@@ -173,19 +188,19 @@ const AgentCoaching = () => {
               {/* Coaching Themes */}
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <GraduationCap className="w-4 h-4 text-amber" />
-                  <p className="text-sm font-semibold text-gray-700">Coaching Focus Areas</p>
+                  <GraduationCap className={`w-4 h-4 ${isDarkMode ? 'text-purple-400' : 'text-amber'}`} />
+                  <p className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Coaching Focus Areas</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {agent.coachingThemes.length > 0 ? agent.coachingThemes.map((theme, idx) => (
                     <span
                       key={idx}
-                      className="px-3 py-1.5 bg-amber/10 text-amber text-xs font-medium rounded-lg"
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg ${isDarkMode ? 'bg-purple-500/20 text-purple-300' : 'bg-amber/10 text-amber'}`}
                     >
                       {theme}
                     </span>
                   )) : (
-                    <span className="px-3 py-1.5 bg-teal/10 text-teal text-xs font-medium rounded-lg">
+                    <span className={`px-3 py-1.5 text-xs font-medium rounded-lg ${isDarkMode ? 'bg-cyan-500/20 text-cyan-300' : 'bg-teal/10 text-teal'}`}>
                       ✓ All areas performing well
                     </span>
                   )}
@@ -195,115 +210,110 @@ const AgentCoaching = () => {
               {/* Recent Nudges */}
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <MessageSquare className="w-4 h-4 text-teal" />
-                  <p className="text-sm font-semibold text-gray-700">Recent Micro-Coaching</p>
+                  <MessageSquare className={`w-4 h-4 ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`} />
+                  <p className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Recent Micro-Coaching</p>
                 </div>
                 <div className="space-y-2">
                   {agent.recentNudges.map((nudge, idx) => (
                     <div key={idx} className={`p-3 rounded-lg text-xs flex items-start gap-2 ${
-                      nudge.type === 'success' ? 'bg-teal/10' : 
-                      nudge.type === 'warning' ? 'bg-amber/10' : 
-                      nudge.type === 'alert' ? 'bg-danger/10' : 'bg-gray-50'
+                      nudge.type === 'success' ? (isDarkMode ? 'bg-cyan-500/10' : 'bg-teal/10') : 
+                      nudge.type === 'warning' ? (isDarkMode ? 'bg-amber-500/10' : 'bg-amber/10') : 
+                      nudge.type === 'alert' ? (isDarkMode ? 'bg-red-500/10' : 'bg-danger/10') : (isDarkMode ? 'bg-purple-900/30' : 'bg-gray-50')
                     }`}>
-                      {nudge.type === 'success' ? <CheckCircle className="w-4 h-4 text-teal flex-shrink-0" /> :
+                      {nudge.type === 'success' ? <CheckCircle className={`w-4 h-4 flex-shrink-0 ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`} /> :
                        nudge.type === 'alert' ? <AlertTriangle className="w-4 h-4 text-danger flex-shrink-0" /> :
                        <MessageSquare className="w-4 h-4 text-amber flex-shrink-0" />}
                       <div>
-                        <p className="text-gray-500 mb-1">{nudge.time}</p>
-                        <p className="text-gray-700">{nudge.message}</p>
+                        <p className={`mb-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{nudge.time}</p>
+                        <p className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{nudge.message}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <Button size="sm" variant="primary" className="flex-1">
-                  Send Coaching
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1">
-                  View History
-                </Button>
-              </div>
+              {/* Action Button - Removed View History */}
+              <Button size="sm" variant="primary" className={`w-full ${isDarkMode ? 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500' : ''}`}>
+                Send Coaching
+              </Button>
             </Card>
           </motion.div>
         )) : (
-          <Card className="p-8 col-span-2 text-center">
-            <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No agent data available. Load calls from Google Sheets to see coaching insights.</p>
+          <Card className={`p-8 col-span-2 text-center ${isDarkMode ? 'bg-[#0d0f1a]/80 border border-purple-500/20' : ''}`}>
+            <GraduationCap className={`w-12 h-12 mx-auto mb-4 ${isDarkMode ? 'text-purple-500' : 'text-gray-300'}`} />
+            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>All agents are performing well! No training needed currently.</p>
           </Card>
         )}
       </div>
 
       {/* Coaching Insights - Real Data */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 bg-teal/5 border-teal/20">
+        <Card className={`p-6 ${isDarkMode ? 'bg-[#0d0f1a]/80 border border-cyan-500/20' : 'bg-teal/5 border-teal/20'}`}>
           <div className="flex items-center gap-3 mb-4">
-            <TrendingUp className="w-6 h-6 text-teal" />
-            <p className="text-sm font-semibold text-gray-600">Agents Performing Well</p>
+            <TrendingUp className={`w-6 h-6 ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`} />
+            <p className={`text-sm font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Agents Performing Well</p>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">{improvingAgents}/{agentsData.length}</p>
-          <p className="text-xs text-gray-600">Agents with QA score above 70% threshold</p>
+          <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-navy'}`}>{improvingAgents}/{allAgentsData.length}</p>
+          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Agents with QA score above 70% threshold</p>
         </Card>
 
-        <Card className="p-6 bg-amber/5 border-amber/20">
+        <Card className={`p-6 ${isDarkMode ? 'bg-[#0d0f1a]/80 border border-purple-500/20' : 'bg-amber/5 border-amber/20'}`}>
           <div className="flex items-center gap-3 mb-4">
-            <MessageSquare className="w-6 h-6 text-amber" />
-            <p className="text-sm font-semibold text-gray-600">Coaching Nudges</p>
+            <MessageSquare className={`w-6 h-6 ${isDarkMode ? 'text-purple-400' : 'text-amber'}`} />
+            <p className={`text-sm font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Coaching Nudges</p>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">{totalNudges}</p>
-          <p className="text-xs text-gray-600">Real-time micro-coaching messages generated from call analysis</p>
+          <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-navy'}`}>{totalNudges}</p>
+          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Real-time micro-coaching messages generated from call analysis</p>
         </Card>
 
-        <Card className="p-6 bg-blue-50 border-blue-200">
+        <Card className={`p-6 ${isDarkMode ? 'bg-[#0d0f1a]/80 border border-purple-500/20' : 'bg-blue-50 border-blue-200'}`}>
           <div className="flex items-center gap-3 mb-4">
-            <GraduationCap className="w-6 h-6 text-blue-500" />
-            <p className="text-sm font-semibold text-gray-600">Top Theme</p>
+            <GraduationCap className={`w-6 h-6 ${isDarkMode ? 'text-purple-400' : 'text-blue-500'}`} />
+            <p className={`text-sm font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Top Theme</p>
           </div>
-          <p className="text-3xl font-bold text-navy mb-2">{topTheme}</p>
-          <p className="text-xs text-gray-600">Most common coaching focus area based on SOP compliance</p>
+          <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-navy'}`}>{topTheme}</p>
+          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Most common coaching focus area based on SOP compliance</p>
         </Card>
       </div>
 
       {/* SOP Agent Evaluation Checklist */}
-      <Card className="p-6">
-        <h3 className="text-lg font-bold text-navy mb-4">SOP Agent Evaluation Checklist</h3>
-        <p className="text-sm text-gray-500 mb-4">Based on Battery Smart SOP v2.0 Standards</p>
+      <Card className={`p-6 ${isDarkMode ? 'bg-[#0d0f1a]/80 border border-purple-500/20' : ''}`}>
+        <h3 className={`text-lg font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-navy'}`}>SOP Agent Evaluation Checklist</h3>
+        <p className={`text-sm mb-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Based on Battery Smart SOP v2.0 Standards</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {agentEvaluationChecklist.map((item, idx) => (
-            <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-teal flex-shrink-0 mt-0.5" />
+            <div key={idx} className={`flex items-start gap-3 p-3 rounded-lg ${isDarkMode ? 'bg-purple-900/20' : 'bg-gray-50'}`}>
+              <CheckCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isDarkMode ? 'text-cyan-400' : 'text-teal'}`} />
               <div>
-                <p className="text-sm font-medium text-navy">{item.item}</p>
-                <p className="text-xs text-gray-500">Max: {item.maxPoints} points</p>
+                <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-navy'}`}>{item.item}</p>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Max: {item.maxPoints} points</p>
               </div>
             </div>
           ))}
         </div>
-        <div className="mt-4 p-3 bg-amber/10 rounded-lg">
-          <p className="text-sm font-medium text-amber">Target Thresholds</p>
-          <p className="text-xs text-gray-600 mt-1">QA Score: ≥85% | SOP Adherence: ≥80% | TAT: &lt;4 minutes</p>
+        <div className={`mt-4 p-3 rounded-lg ${isDarkMode ? 'bg-purple-500/10' : 'bg-amber/10'}`}>
+          <p className={`text-sm font-medium ${isDarkMode ? 'text-purple-300' : 'text-amber'}`}>Target Thresholds</p>
+          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>QA Score: ≥85% | SOP Adherence: ≥80% | TAT: &lt;4 minutes</p>
         </div>
       </Card>
 
       {/* Timeline View - Real Data */}
-      <Card className="p-6">
-        <h3 className="text-lg font-bold text-navy mb-6">Recent Coaching Activity</h3>
+      <Card className={`p-6 ${isDarkMode ? 'bg-[#0d0f1a]/80 border border-purple-500/20' : ''}`}>
+        <h3 className={`text-lg font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-navy'}`}>Recent Coaching Activity</h3>
         <div className="space-y-4">
           {calls.slice(0, 4).map((call, idx) => {
             const isHighRisk = call.riskLevel === 'high';
             const isLowQa = (call.qaScore || 0) < 80;
             const coachingType = isHighRisk ? 'Risk Management' : isLowQa ? 'QA Improvement' : 'Positive Reinforcement';
-            const dotColor = isHighRisk ? 'bg-danger' : isLowQa ? 'bg-amber' : 'bg-teal';
+            const dotColor = isHighRisk ? 'bg-danger' : isLowQa ? 'bg-amber' : (isDarkMode ? 'bg-cyan-400' : 'bg-teal');
             
             return (
               <div key={idx} className="flex items-start gap-4">
                 <div className={`w-2 h-2 ${dotColor} rounded-full mt-2`}></div>
-                <div className="flex-1 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">{call.date || 'Today'}</p>
-                  <p className="text-sm font-semibold text-navy">{call.agent} - {coachingType}</p>
-                  <p className="text-xs text-gray-600 mt-1">
+                <div className={`flex-1 p-4 rounded-lg ${isDarkMode ? 'bg-purple-900/20' : 'bg-gray-50'}`}>
+                  <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{call.date || 'Today'}</p>
+                  <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-navy'}`}>{call.agent} - {coachingType}</p>
+                  <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                     {isHighRisk 
                       ? `High-risk call flagged - ${call.callType}. Escalation recommended.`
                       : isLowQa 
@@ -316,7 +326,7 @@ const AgentCoaching = () => {
             );
           })}
           {calls.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
+            <div className={`text-center py-8 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
               <p>No coaching activity yet. Load calls to generate coaching timeline.</p>
             </div>
           )}
