@@ -4,7 +4,7 @@ import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
 
-const Layout = ({ children, activePage, setActivePage }) => {
+const Layout = ({ children, activePage, setActivePage, onLogout }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -33,6 +33,7 @@ const Layout = ({ children, activePage, setActivePage }) => {
         currentPage={pageNames[activePage]} 
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
         isMobile={isMobile}
+        onLogout={onLogout}
       />
       
       {/* Desktop Sidebar */}

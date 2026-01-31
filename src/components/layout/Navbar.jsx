@@ -1,14 +1,16 @@
-import { Building2, Calendar, ChevronDown, User, Bell, Menu } from 'lucide-react';
+import { Building2, Calendar, ChevronDown, User, Menu, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import DataSettings from '../shared/DataSettings';
+import NotificationCenter from '../shared/NotificationCenter';
+import { useData } from '../../context/DataContext';
 
-const Navbar = ({ currentPage, onMenuClick, isMobile }) => {
-  const [selectedCity, setSelectedCity] = useState('All Cities');
-  const [dateRange, setDateRange] = useState('Today');
+const Navbar = ({ currentPage, onMenuClick, isMobile, onLogout }) => {
+  const { selectedCity, setSelectedCity, selectedDateRange, setSelectedDateRange } = useData();
+  const [showLogoutMenu, setShowLogoutMenu] = useState(false);
 
-  const cities = ['All Cities', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad'];
-  const dateRanges = ['Today', 'Last 7 Days', 'Last 30 Days', 'Custom'];
+  const cities = ['All Cities', 'Delhi', 'Noida', 'Gurgaon', 'Ghaziabad', 'Bangalore', 'Pune', 'Hyderabad'];
+  const dateRanges = ['All Time', 'Today', 'Last 7 Days', 'Last 30 Days'];
 
   return (
     <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 fixed top-0 left-0 right-0 z-50">
@@ -76,8 +78,8 @@ const Navbar = ({ currentPage, onMenuClick, isMobile }) => {
           {/* Date Range Selector - Desktop only */}
           <div className="relative hidden lg:block">
             <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
+              value={selectedDateRange}
+              onChange={(e) => setSelectedDateRange(e.target.value)}
               className="appearance-none bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 pr-10 pl-10 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors"
             >
               {dateRanges.map((range) => (
@@ -91,27 +93,45 @@ const Navbar = ({ currentPage, onMenuClick, isMobile }) => {
           </div>
 
           {/* Notifications */}
-          <motion.button 
-            whileTap={{ scale: 0.9 }}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative touch-target"
-          >
-            <Bell className="w-5 h-5 text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full animate-pulse"></span>
-          </motion.button>
+          <NotificationCenter />
 
           {/* Data Settings */}
           <div className="hidden sm:block">
             <DataSettings />
           </div>
 
-          {/* Profile */}
-          <motion.div 
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-1 md:gap-2 bg-teal/10 px-2 md:px-4 py-2 rounded-lg cursor-pointer"
-          >
-            <User className="w-5 h-5 text-teal" />
-            <span className="hidden sm:block text-sm font-medium text-navy">Supervisor</span>
-          </motion.div>
+          {/* Profile with Logout */}
+          <div className="relative">
+            <motion.div 
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowLogoutMenu(!showLogoutMenu)}
+              className="flex items-center gap-1 md:gap-2 bg-teal/10 px-2 md:px-4 py-2 rounded-lg cursor-pointer"
+            >
+              <User className="w-5 h-5 text-teal" />
+              <span className="hidden sm:block text-sm font-medium text-navy">Supervisor</span>
+              <ChevronDown className="w-4 h-4 text-gray-400 hidden sm:block" />
+            </motion.div>
+            
+            {/* Logout Dropdown */}
+            {showLogoutMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute right-0 top-12 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50"
+              >
+                <button
+                  onClick={() => {
+                    setShowLogoutMenu(false);
+                    onLogout && onLogout();
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 hover:bg-red-50 text-red-600 font-medium text-sm w-full"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </motion.div>
+            )}
+          </div>
         </div>
       </div>
     </nav>

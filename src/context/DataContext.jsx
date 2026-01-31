@@ -88,6 +88,10 @@ export const DataProvider = ({ children }) => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [sheetUrl, setSheetUrl] = useState(SHEET_URL);
   const [dataSource, setDataSource] = useState('live'); // 'demo' or 'live'
+  
+  // Global filters
+  const [selectedCity, setSelectedCity] = useState('All Cities');
+  const [selectedDateRange, setSelectedDateRange] = useState('All Time');
 
   // Initialize analytics on load
   useEffect(() => {
@@ -158,14 +162,41 @@ export const DataProvider = ({ children }) => {
 
   // Get calls by filter
   const getFilteredCalls = useCallback((filters = {}) => {
+    const city = filters.city || selectedCity;
+    const dateRange = filters.dateRange || selectedDateRange;
+    
     return calls.filter(call => {
-      if (filters.city && filters.city !== 'All Cities' && call.city !== filters.city) return false;
+      // City filter
+      if (city && city !== 'All Cities' && call.city !== city) return false;
+      
+      // Date filter
+      if (dateRange && dateRange !== 'All Time') {
+        const callDate = new Date(call.callDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (dateRange === 'Today') {
+          const callDay = new Date(callDate);
+          callDay.setHours(0, 0, 0, 0);
+          if (callDay.getTime() !== today.getTime()) return false;
+        } else if (dateRange === 'Last 7 Days') {
+          const weekAgo = new Date(today);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          if (callDate < weekAgo) return false;
+        } else if (dateRange === 'Last 30 Days') {
+          const monthAgo = new Date(today);
+          monthAgo.setDate(monthAgo.getDate() - 30);
+          if (callDate < monthAgo) return false;
+        }
+      }
+      
+      // Other filters
       if (filters.riskLevel && call.riskLevel !== filters.riskLevel) return false;
       if (filters.sentiment && call.sentiment !== filters.sentiment) return false;
       if (filters.agent && call.agent !== filters.agent) return false;
       return true;
     });
-  }, [calls]);
+  }, [calls, selectedCity, selectedDateRange]);
 
   // Get live (recent) calls
   const getLiveCalls = useCallback((limit = 10) => {
@@ -193,6 +224,8 @@ export const DataProvider = ({ children }) => {
     lastUpdated,
     sheetUrl,
     dataSource,
+    selectedCity,
+    selectedDateRange,
     
     // Actions
     fetchFromGoogleSheets,
@@ -200,6 +233,8 @@ export const DataProvider = ({ children }) => {
     refresh,
     loadDemoData,
     setSheetUrl,
+    setSelectedCity,
+    setSelectedDateRange,
     
     // Getters
     getFilteredCalls,

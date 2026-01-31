@@ -33,7 +33,7 @@ const getDirectAudioUrl = (driveUrl) => {
 };
 
 const LiveCallMonitoring = () => {
-  const { calls, getLiveCalls, analyzeAllAudio, analyzing, refresh, loading } = useData();
+  const { calls, getLiveCalls, getFilteredCalls, analyzeAllAudio, analyzing, refresh, loading, selectedCity, selectedDateRange } = useData();
   const [selectedCall, setSelectedCall] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [transcription, setTranscription] = useState(null);
@@ -51,8 +51,9 @@ const LiveCallMonitoring = () => {
   const [audioError, setAudioError] = useState(null);
   const [audioLoading, setAudioLoading] = useState(false);
 
-  // Use real calls or fallback to mock data
-  const allCalls = calls.length > 0 ? getLiveCalls(15) : fallbackCalls;
+  // Use filtered calls based on navbar selections
+  const allFilteredCalls = getFilteredCalls();
+  const allCalls = allFilteredCalls.length > 0 ? allFilteredCalls.slice(0, 15) : getLiveCalls(15);
   
   // Apply risk level filter
   const displayCalls = riskFilter === 'all' 
@@ -196,7 +197,8 @@ const LiveCallMonitoring = () => {
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Today';
     const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   return (
@@ -212,7 +214,9 @@ const LiveCallMonitoring = () => {
           <h2 className="text-2xl font-bold text-navy">Live Call Monitoring</h2>
           <p className="text-sm text-gray-600 mt-1">
             Real-time call quality analysis • {displayCalls.length} calls displayed
-            {riskFilter !== 'all' && ` (filtered: ${riskFilter} risk)`}
+            {selectedCity !== 'All Cities' && ` • ${selectedCity}`}
+            {selectedDateRange !== 'All Time' && ` • ${selectedDateRange}`}
+            {riskFilter !== 'all' && ` • ${riskFilter} risk`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -262,7 +266,7 @@ const LiveCallMonitoring = () => {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Call ID</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Time</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Agent</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">City</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Issue Summary</th>

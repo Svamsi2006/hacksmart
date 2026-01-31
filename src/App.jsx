@@ -10,18 +10,34 @@ import AgentCoaching from './components/pages/AgentCoaching';
 import SupervisorAlerts from './components/pages/SupervisorAlerts';
 import DataLoadingOverlay from './components/shared/DataLoadingOverlay';
 import LoadingScreen from './components/shared/LoadingScreen';
+import LoginScreen from './components/auth/LoginScreen';
+import ChatBot from './components/shared/ChatBot';
 
 function App() {
   const [activePage, setActivePage] = useState('overview');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    // Check if user was previously authenticated
+    return localStorage.getItem('smartaudit_authenticated') === 'true';
+  });
 
   // Initial loading screen
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsInitialLoading(false);
-    }, 2500); // Show loading screen for 2.5 seconds
+    }, 2500);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    localStorage.setItem('smartaudit_authenticated', 'true');
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('smartaudit_authenticated');
+  };
 
   const renderPage = () => {
     switch (activePage) {
@@ -45,14 +61,17 @@ function App() {
   return (
     <DataProvider>
       <AnimatePresence mode="wait">
-        {isInitialLoading ? (
+        {!isAuthenticated ? (
+          <LoginScreen key="login" onLogin={handleLogin} />
+        ) : isInitialLoading ? (
           <LoadingScreen key="loading" message="Initializing dashboard..." />
         ) : (
           <>
             <DataLoadingOverlay />
-            <Layout activePage={activePage} setActivePage={setActivePage}>
+            <Layout activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout}>
               {renderPage()}
             </Layout>
+            <ChatBot />
           </>
         )}
       </AnimatePresence>
