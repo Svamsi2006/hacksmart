@@ -440,17 +440,40 @@ const RevenueLeakage = () => {
                     />
                     
                     {audioError ? (
-                      <div className="text-center py-2">
-                        <p className="text-sm text-amber-600 mb-3">{audioError}</p>
-                        <a 
-                          href={selectedCall.audioUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-teal text-white rounded-lg hover:bg-teal/90 transition-colors"
-                        >
-                          <Download className="w-4 h-4" />
-                          Open in Google Drive
-                        </a>
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                            <FileAudio className="w-5 h-5 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-amber-800">Audio Loading Issue</p>
+                            <p className="text-xs text-amber-600">{audioError}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setAudioError(null);
+                              setAudioLoading(true);
+                              if (audioRef.current) {
+                                audioRef.current.load();
+                              }
+                            }}
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition-colors text-sm font-medium"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                            Retry
+                          </button>
+                          <a 
+                            href={selectedCall.audioUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-teal text-white rounded-lg hover:bg-teal/90 transition-colors text-sm font-medium"
+                          >
+                            <Download className="w-4 h-4" />
+                            Open in Drive
+                          </a>
+                        </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-4">

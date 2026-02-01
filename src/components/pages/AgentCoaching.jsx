@@ -107,11 +107,8 @@ const AgentCoaching = () => {
 
   const allAgentsData = generateAgentData();
   
-  // Filter to show only agents who need training (SOP adherence < 80%)
-  const agentsData = allAgentsData.filter(agent => {
-    // Include if SOP score is below 80 OR QA score is below 80 OR status is needs-attention
-    return agent.sopScore < 80 || agent.qaScore < 80 || agent.status === 'needs-attention';
-  });
+  // Filter to show ONLY agents with SOP score strictly below 80%
+  const agentsData = allAgentsData.filter(agent => agent.sopScore < 80);
   
   // Calculate overall stats
   const totalAgentsNeedingTraining = agentsData.length;
