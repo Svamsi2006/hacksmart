@@ -1379,13 +1379,61 @@ This is a customer service call for Battery Smart, an electric vehicle battery s
                       {/* Results */}
                       {!isAnalyzingAI && distilbertAnalysis && (
                         <div className="space-y-4">
-                          {/* Sentiment Analysis */}
+                          {/* Overall AI Score Card */}
+                          <div className={`p-4 rounded-xl bg-gradient-to-br ${
+                            distilbertAnalysis.sentiment?.label === 'positive' 
+                              ? 'from-emerald-500 to-teal-600' 
+                              : distilbertAnalysis.sentiment?.label === 'negative'
+                                ? 'from-red-500 to-rose-600'
+                                : 'from-amber-500 to-orange-600'
+                          } text-white`}>
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                                  <span className="text-2xl">
+                                    {distilbertAnalysis.sentiment?.label === 'positive' ? '✅' : 
+                                     distilbertAnalysis.sentiment?.label === 'negative' ? '⚠️' : '📊'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-lg font-bold">AI Analysis Complete</p>
+                                  <p className="text-sm opacity-90">Call ID: {selectedCall.id}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-3xl font-bold">
+                                  {Math.round((
+                                    (distilbertAnalysis.sentiment?.confidence || 50) * 0.4 +
+                                    (distilbertAnalysis.category?.confidence || 50) * 0.3 +
+                                    (distilbertAnalysis.emotion?.confidence || 50) * 0.3
+                                  ))}%
+                                </p>
+                                <p className="text-xs opacity-80">Overall Confidence</p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 mt-3">
+                              <div className="bg-white/20 rounded-lg p-2 text-center">
+                                <p className="text-xs opacity-80">Sentiment</p>
+                                <p className="font-bold text-sm">{distilbertAnalysis.sentiment?.label?.toUpperCase()}</p>
+                              </div>
+                              <div className="bg-white/20 rounded-lg p-2 text-center">
+                                <p className="text-xs opacity-80">Emotion</p>
+                                <p className="font-bold text-sm capitalize">{distilbertAnalysis.emotion?.emotion || 'Neutral'}</p>
+                              </div>
+                              <div className="bg-white/20 rounded-lg p-2 text-center">
+                                <p className="text-xs opacity-80">Category</p>
+                                <p className="font-bold text-sm truncate">{(distilbertAnalysis.category?.category || 'General').split(' ').slice(0, 2).join(' ')}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Sentiment Analysis with Details */}
                           <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
                             <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                               <Activity className="w-4 h-4 text-violet-500" />
                               Sentiment Analysis
                             </p>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 mb-4">
                               <div className={`px-4 py-2 rounded-lg font-bold text-lg ${
                                 distilbertAnalysis.sentiment?.label === 'positive' 
                                   ? 'bg-emerald-100 text-emerald-700' 
@@ -1414,76 +1462,170 @@ This is a customer service call for Battery Smart, an electric vehicle battery s
                                 </div>
                               </div>
                             </div>
+                            {/* Sentiment Interpretation */}
+                            <div className={`p-3 rounded-lg ${
+                              distilbertAnalysis.sentiment?.label === 'positive' 
+                                ? 'bg-emerald-50 border border-emerald-200' 
+                                : distilbertAnalysis.sentiment?.label === 'negative'
+                                  ? 'bg-red-50 border border-red-200'
+                                  : 'bg-amber-50 border border-amber-200'
+                            }`}>
+                              <p className={`text-sm font-medium ${
+                                distilbertAnalysis.sentiment?.label === 'positive' ? 'text-emerald-800' :
+                                distilbertAnalysis.sentiment?.label === 'negative' ? 'text-red-800' : 'text-amber-800'
+                              }`}>
+                                {distilbertAnalysis.sentiment?.label === 'positive' 
+                                  ? '✅ Customer expressed satisfaction. The interaction was positive and the customer seems happy with the service or resolution provided.'
+                                  : distilbertAnalysis.sentiment?.label === 'negative'
+                                    ? '⚠️ Customer expressed dissatisfaction. This call requires attention - customer may have unresolved issues or complaints.'
+                                    : '📊 Customer tone was neutral. Standard interaction without strong positive or negative emotions.'}
+                              </p>
+                            </div>
                           </div>
 
-                          {/* Call Category */}
+                          {/* Call Category with Recommendations */}
                           <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
                             <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                               <FileText className="w-4 h-4 text-violet-500" />
                               Call Category (Zero-Shot Classification)
                             </p>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               <div className="flex items-center justify-between">
                                 <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-navy'}`}>
-                                  {distilbertAnalysis.category?.category || 'General Inquiry'}
+                                  🎯 {distilbertAnalysis.category?.category || 'General Inquiry'}
                                 </span>
                                 <Badge className="bg-violet-500 text-white">
                                   {distilbertAnalysis.category?.confidence || 50}% match
                                 </Badge>
                               </div>
-                              {distilbertAnalysis.category?.allCategories?.slice(1, 3).map((cat, i) => (
+                              {distilbertAnalysis.category?.allCategories?.slice(1, 4).map((cat, i) => (
                                 <div key={i} className={`flex items-center justify-between text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                   <span>{cat.label}</span>
-                                  <span>{cat.score}%</span>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-20 h-1.5 bg-gray-200 rounded-full">
+                                      <div className="h-1.5 bg-violet-400 rounded-full" style={{ width: `${cat.score}%` }} />
+                                    </div>
+                                    <span className="text-xs w-8">{cat.score}%</span>
+                                  </div>
                                 </div>
                               ))}
                             </div>
+                            {/* Category-based Recommendation */}
+                            <div className="mt-4 p-3 rounded-lg bg-violet-50 border border-violet-200">
+                              <p className="text-xs font-semibold text-violet-700 mb-1">💡 AI Recommendation</p>
+                              <p className="text-sm text-violet-800">
+                                {(distilbertAnalysis.category?.category || '').toLowerCase().includes('stolen') 
+                                  ? 'Escalate to security team. Initiate theft investigation protocol and document all details.'
+                                  : (distilbertAnalysis.category?.category || '').toLowerCase().includes('complaint') || (distilbertAnalysis.category?.category || '').toLowerCase().includes('range')
+                                    ? 'Create support ticket for technical review. Offer compensation or free swap if applicable.'
+                                    : (distilbertAnalysis.category?.category || '').toLowerCase().includes('penalty')
+                                      ? 'Review penalty policy with customer. Consider waiver for first-time cases.'
+                                      : (distilbertAnalysis.category?.category || '').toLowerCase().includes('swap')
+                                        ? 'Ensure customer has app access to nearest swap stations. Verify subscription status.'
+                                        : 'Standard follow-up within 24 hours. Update customer records with call notes.'}
+                              </p>
+                            </div>
                           </div>
 
-                          {/* Emotion Detection */}
+                          {/* Emotion Detection with All Emotions */}
                           <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
                             <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                               <Sparkles className="w-4 h-4 text-violet-500" />
-                              Emotion Detection
+                              Emotion Detection (DistilRoBERTa)
                             </p>
-                            <div className="flex items-center gap-3">
-                              <span className="text-3xl">
-                                {distilbertAnalysis.emotion?.emotion === 'joy' ? '😊' :
-                                 distilbertAnalysis.emotion?.emotion === 'anger' ? '😠' :
-                                 distilbertAnalysis.emotion?.emotion === 'sadness' ? '😢' :
-                                 distilbertAnalysis.emotion?.emotion === 'fear' ? '😨' :
-                                 distilbertAnalysis.emotion?.emotion === 'surprise' ? '😮' :
-                                 distilbertAnalysis.emotion?.emotion === 'disgust' ? '🤢' : '😐'}
-                              </span>
-                              <div>
-                                <p className={`font-medium capitalize ${isDarkMode ? 'text-white' : 'text-navy'}`}>
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className="text-center">
+                                <span className="text-4xl">
+                                  {distilbertAnalysis.emotion?.emotion === 'joy' ? '😊' :
+                                   distilbertAnalysis.emotion?.emotion === 'anger' ? '😠' :
+                                   distilbertAnalysis.emotion?.emotion === 'sadness' ? '😢' :
+                                   distilbertAnalysis.emotion?.emotion === 'fear' ? '😨' :
+                                   distilbertAnalysis.emotion?.emotion === 'surprise' ? '😮' :
+                                   distilbertAnalysis.emotion?.emotion === 'disgust' ? '🤢' : '😐'}
+                                </span>
+                                <p className={`text-sm font-medium capitalize mt-1 ${isDarkMode ? 'text-white' : 'text-navy'}`}>
                                   {distilbertAnalysis.emotion?.emotion || 'Neutral'}
                                 </p>
-                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                  {distilbertAnalysis.emotion?.confidence || 50}% confidence
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Primary Emotion Confidence</span>
+                                  <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-navy'}`}>{distilbertAnalysis.emotion?.confidence || 50}%</span>
+                                </div>
+                                <div className={`h-2 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-gray-200'}`}>
+                                  <div className="h-2 rounded-full bg-violet-500" style={{ width: `${distilbertAnalysis.emotion?.confidence || 50}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                            {/* All detected emotions */}
+                            {distilbertAnalysis.emotion?.allEmotions && (
+                              <div className="grid grid-cols-3 gap-2">
+                                {distilbertAnalysis.emotion.allEmotions.slice(0, 6).map((em, i) => (
+                                  <div key={i} className={`p-2 rounded-lg text-center ${i === 0 ? 'bg-violet-100 border-2 border-violet-300' : 'bg-gray-50'}`}>
+                                    <span className="text-lg">
+                                      {em.label === 'joy' ? '😊' : em.label === 'anger' ? '😠' : em.label === 'sadness' ? '😢' :
+                                       em.label === 'fear' ? '😨' : em.label === 'surprise' ? '😮' : em.label === 'disgust' ? '🤢' : '😐'}
+                                    </span>
+                                    <p className="text-xs capitalize text-gray-600">{em.label}</p>
+                                    <p className="text-xs font-bold text-violet-600">{em.score}%</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* AI-Generated Insights */}
+                          <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-gradient-to-br from-violet-50 to-purple-50'} border ${isDarkMode ? 'border-slate-700' : 'border-violet-200'}`}>
+                            <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-violet-800'}`}>
+                              <Brain className="w-4 h-4 text-violet-500" />
+                              🧠 AI-Generated Insights
+                            </p>
+                            <div className="space-y-3">
+                              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'}`}>
+                                <p className={`text-xs font-semibold ${isDarkMode ? 'text-violet-400' : 'text-violet-600'} mb-1`}>📋 Call Summary</p>
+                                <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {distilbertAnalysis.summary?.summary || 
+                                   `Customer call regarding ${distilbertAnalysis.category?.category || 'general inquiry'}. 
+                                    Sentiment detected as ${distilbertAnalysis.sentiment?.label || 'neutral'} with 
+                                    ${distilbertAnalysis.emotion?.emotion || 'neutral'} emotional undertone.`}
+                                </p>
+                              </div>
+                              
+                              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'}`}>
+                                <p className={`text-xs font-semibold ${isDarkMode ? 'text-violet-400' : 'text-violet-600'} mb-1`}>⚡ Action Required</p>
+                                <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {distilbertAnalysis.sentiment?.label === 'negative' 
+                                    ? '🔴 HIGH PRIORITY: Follow up within 2 hours. Customer satisfaction at risk.'
+                                    : distilbertAnalysis.sentiment?.label === 'positive'
+                                      ? '🟢 LOW PRIORITY: Standard follow-up. Consider for testimonial/review request.'
+                                      : '🟡 MEDIUM PRIORITY: Follow up within 24 hours. Monitor for escalation.'}
+                                </p>
+                              </div>
+
+                              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'}`}>
+                                <p className={`text-xs font-semibold ${isDarkMode ? 'text-violet-400' : 'text-violet-600'} mb-1`}>📈 Quality Score Impact</p>
+                                <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {distilbertAnalysis.sentiment?.label === 'positive' 
+                                    ? 'This call positively impacts agent quality score. Good handling of customer needs.'
+                                    : distilbertAnalysis.sentiment?.label === 'negative'
+                                      ? 'This call may negatively impact quality metrics. Coaching recommended for agent.'
+                                      : 'Neutral impact on quality score. Standard call handling observed.'}
                                 </p>
                               </div>
                             </div>
                           </div>
 
-                          {/* AI Summary */}
-                          <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
-                            <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                              <Brain className="w-4 h-4 text-violet-500" />
-                              AI Summary
-                            </p>
-                            <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                              {distilbertAnalysis.summary?.summary || 'Analysis complete. View sentiment and classification results above.'}
-                            </p>
-                          </div>
-
                           {/* Model Info */}
                           <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-violet-900/20' : 'bg-violet-50'} text-center`}>
                             <p className={`text-xs ${isDarkMode ? 'text-violet-400' : 'text-violet-600'}`}>
-                              Powered by <strong>Hugging Face Transformers</strong> • Models: distilbert-base-uncased, bart-large-mnli, distilroberta-emotion
+                              Powered by <strong>Hugging Face Transformers</strong>
+                            </p>
+                            <p className={`text-xs mt-1 ${isDarkMode ? 'text-violet-500' : 'text-violet-500'}`}>
+                              📊 Models: distilbert-base-uncased • bart-large-mnli • distilroberta-emotion
                             </p>
                             <p className={`text-xs mt-1 ${isDarkMode ? 'text-violet-500' : 'text-violet-400'}`}>
-                              Analyzed at: {distilbertAnalysis.analyzedAt ? new Date(distilbertAnalysis.analyzedAt).toLocaleTimeString() : 'N/A'}
+                              🕐 Analyzed: {distilbertAnalysis.analyzedAt ? new Date(distilbertAnalysis.analyzedAt).toLocaleString() : 'N/A'} | 
+                              📝 Text: {distilbertAnalysis.textLength || 0} chars
                             </p>
                           </div>
                         </div>
