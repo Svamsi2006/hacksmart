@@ -497,7 +497,7 @@ Smart-Audit AI Dashboard
               <tr>
                 <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Call ID</th>
                 <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Date</th>
-                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Agent</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Customer</th>
                 <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Phone</th>
                 <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>City</th>
                 <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Issue Summary</th>
