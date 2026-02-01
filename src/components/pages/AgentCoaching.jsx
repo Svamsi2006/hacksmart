@@ -107,12 +107,14 @@ const AgentCoaching = () => {
 
   const allAgentsData = generateAgentData();
   
-  // Filter to show only agents who need training (low SOP adherence < 80% or needs-attention status)
-  const agentsData = allAgentsData.filter(agent => 
-    agent.sopScore < 80 || agent.status === 'needs-attention'
-  );
+  // Filter to show only agents who need training (SOP adherence < 80%)
+  const agentsData = allAgentsData.filter(agent => {
+    // Include if SOP score is below 80 OR QA score is below 80 OR status is needs-attention
+    return agent.sopScore < 80 || agent.qaScore < 80 || agent.status === 'needs-attention';
+  });
   
   // Calculate overall stats
+  const totalAgentsNeedingTraining = agentsData.length;
   const totalNudges = agentsData.reduce((sum, a) => sum + a.recentNudges.length, 0);
   const improvingAgents = allAgentsData.filter(a => a.status === 'high-performer' || a.status === 'improving').length;
   const topTheme = agentsData.flatMap(a => a.coachingThemes)[0] || 'SOP Compliance';

@@ -31,10 +31,10 @@ const Overview = ({ setActivePage }) => {
     getHighRiskCalls
   } = useData();
 
-  // API Key state
-  const [apiKey, setApiKey] = useState(localStorage.getItem('deepgram_api_key') || '');
+  // API Key state - Always show empty input by default, never pre-fill
+  const [apiKey, setApiKey] = useState('');
   const [apiKeyStatus, setApiKeyStatus] = useState(localStorage.getItem('deepgram_api_key') ? 'saved' : 'empty');
-  const [showApiInput, setShowApiInput] = useState(!localStorage.getItem('deepgram_api_key'));
+  const [showApiInput, setShowApiInput] = useState(true); // Always show input
 
   // Handle API key submission
   const handleApiKeySubmit = () => {
