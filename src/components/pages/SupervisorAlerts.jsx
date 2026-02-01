@@ -9,8 +9,8 @@ import { supervisorAlerts as fallbackAlerts } from '../../data/mockData';
 import { calculateRealKPIs, formatIndianCurrency, generateIssueSummary } from '../../services/analyticsService';
 import { sendSupervisorAlertEmail } from '../../services/emailService';
 
-// Helper function to get direct audio URL from Google Drive
-const getDirectAudioUrl = (driveUrl) => {
+// Helper function to extract file ID from Google Drive URL
+const extractDriveFileId = (driveUrl) => {
   if (!driveUrl) return null;
   const patterns = [
     /\/file\/d\/([a-zA-Z0-9_-]+)/,
@@ -20,8 +20,17 @@ const getDirectAudioUrl = (driveUrl) => {
   for (const pattern of patterns) {
     const match = driveUrl.match(pattern);
     if (match) {
-      return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+      return match[1];
     }
+  }
+  return null;
+};
+
+// Get embed URL for Google Drive audio
+const getEmbedAudioUrl = (driveUrl) => {
+  const fileId = extractDriveFileId(driveUrl);
+  if (fileId) {
+    return `https://drive.google.com/file/d/${fileId}/preview`;
   }
   return driveUrl;
 };
@@ -477,104 +486,49 @@ Date: ${new Date().toLocaleString()}
                 </div>
 
                 <div className="p-6 space-y-6 overflow-y-auto flex-1">
-                  {/* Audio Player */}
+                  {/* Audio Player - Embedded Google Drive Player */}
                   <div className="bg-gradient-to-r from-navy/5 to-teal/5 rounded-xl p-4">
-                    <audio
-                      ref={audioRef}
-                      src={getDirectAudioUrl(selectedCall.audioUrl)}
-                      onTimeUpdate={handleTimeUpdate}
-                      onLoadedMetadata={handleLoadedMetadata}
-                      onError={() => { setAudioError('Unable to load audio'); setAudioLoading(false); }}
-                      onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
-                      onCanPlay={() => setAudioLoading(false)}
-                      preload="metadata"
-                    />
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-teal/20 rounded-full flex items-center justify-center">
+                        <FileAudio className="w-5 h-5 text-teal" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-navy">Audio Recording</p>
+                        <p className="text-xs text-gray-500">Call ID: {selectedCall.id} • Duration: {selectedCall.duration || '5:30'}</p>
+                      </div>
+                    </div>
                     
-                    {audioError ? (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                            <FileAudio className="w-5 h-5 text-amber-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-amber-800">Audio Loading Issue</p>
-                            <p className="text-xs text-amber-600">{audioError}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setAudioError(null);
-                              setAudioLoading(true);
-                              if (audioRef.current) {
-                                audioRef.current.load();
-                              }
-                            }}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition-colors text-sm font-medium"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                            Retry
-                          </button>
+                    {/* Embedded Google Drive Audio Player */}
+                    {selectedCall.audioUrl ? (
+                      <div className="relative rounded-lg overflow-hidden bg-gray-900">
+                        <iframe
+                          src={getEmbedAudioUrl(selectedCall.audioUrl)}
+                          width="100%"
+                          height="80"
+                          frameBorder="0"
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                          className="w-full"
+                          title="Audio Player"
+                        />
+                        <div className="flex items-center justify-between mt-3">
                           <a 
                             href={selectedCall.audioUrl} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-teal text-white rounded-lg hover:bg-teal/90 transition-colors text-sm font-medium"
+                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs font-medium"
                           >
-                            <Download className="w-4 h-4" />
-                            Open in Drive
+                            <Download className="w-3.5 h-3.5" />
+                            Download
                           </a>
+                          <span className="text-xs text-gray-500">
+                            Powered by Google Drive
+                          </span>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-4">
-                        <button 
-                          onClick={togglePlay}
-                          disabled={audioLoading}
-                          className="w-14 h-14 bg-teal rounded-full flex items-center justify-center hover:bg-teal/90 transition-colors shadow-lg disabled:opacity-50"
-                        >
-                          {audioLoading ? (
-                            <Loader2 className="w-6 h-6 text-white animate-spin" />
-                          ) : isPlaying ? (
-                            <Pause className="w-6 h-6 text-white" />
-                          ) : (
-                            <Play className="w-6 h-6 text-white ml-1" />
-                          )}
-                        </button>
-
-                        <div className="flex-1">
-                          <div 
-                            className="h-2 bg-gray-200 rounded-full overflow-hidden cursor-pointer"
-                            onClick={handleSeek}
-                          >
-                            <div 
-                              className="h-2 bg-teal rounded-full transition-all duration-100"
-                              style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-                            />
-                          </div>
-                          <div className="flex justify-between mt-2 text-xs text-gray-500">
-                            <span>{formatTime(currentTime)}</span>
-                            <span className="font-medium">{formatTime(duration) || selectedCall.duration || '0:00'}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => skipTime(-10)} className="p-2 hover:bg-white rounded-lg transition-colors" title="Rewind 10s">
-                            <SkipBack className="w-4 h-4 text-gray-600" />
-                          </button>
-                          <button onClick={restartAudio} className="p-2 hover:bg-white rounded-lg transition-colors" title="Restart">
-                            <RotateCcw className="w-4 h-4 text-gray-600" />
-                          </button>
-                          <button onClick={() => skipTime(10)} className="p-2 hover:bg-white rounded-lg transition-colors" title="Forward 10s">
-                            <SkipForward className="w-4 h-4 text-gray-600" />
-                          </button>
-                          <button onClick={toggleMute} className="p-2 hover:bg-white rounded-lg transition-colors" title={isMuted ? 'Unmute' : 'Mute'}>
-                            {isMuted ? <VolumeX className="w-4 h-4 text-gray-600" /> : <Volume2 className="w-4 h-4 text-gray-600" />}
-                          </button>
-                          <a href={selectedCall.audioUrl} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-white rounded-lg transition-colors" title="Download">
-                            <Download className="w-4 h-4 text-gray-600" />
-                          </a>
-                        </div>
+                      <div className="text-center py-4 text-gray-500 text-sm">
+                        No audio recording available
                       </div>
                     )}
                   </div>
