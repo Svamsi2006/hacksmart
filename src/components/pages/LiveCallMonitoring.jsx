@@ -73,7 +73,7 @@ const LiveCallMonitoring = () => {
 
   // Use filtered calls based on navbar selections
   const allFilteredCalls = getFilteredCalls();
-  const allCalls = allFilteredCalls.length > 0 ? allFilteredCalls.slice(0, 100) : getLiveCalls(100);
+  const allCalls = allFilteredCalls.length > 0 ? allFilteredCalls : getLiveCalls();
   
   // Apply risk level filter and search
   const displayCalls = allCalls.filter(call => {
@@ -92,7 +92,7 @@ const LiveCallMonitoring = () => {
       );
     }
     return true;
-  }).slice(0, 15);
+  });
 
   // Export functions
   const exportToCSV = () => {
