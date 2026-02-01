@@ -6,6 +6,7 @@ import {
   TrendingDown, 
   GraduationCap, 
   AlertTriangle,
+  Info,
   X
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
@@ -21,6 +22,7 @@ const Sidebar = ({ activePage, setActivePage, isMobile = false, onClose }) => {
     { id: 'revenue-leakage', label: 'Revenue Leakage', icon: TrendingDown },
     { id: 'agent-coaching', label: 'Agent Coaching', icon: GraduationCap },
     { id: 'supervisor-alerts', label: 'Supervisor Alerts', icon: AlertTriangle },
+    { id: 'about', label: 'What We Do', icon: Info },
   ];
 
   return (

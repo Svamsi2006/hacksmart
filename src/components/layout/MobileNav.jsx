@@ -5,7 +5,8 @@ import {
   BarChart3, 
   TrendingDown, 
   Users,
-  AlertTriangle
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 
 const MobileNav = ({ activePage, setActivePage }) => {
@@ -16,6 +17,7 @@ const MobileNav = ({ activePage, setActivePage }) => {
     { id: 'revenue-leakage', icon: TrendingDown, label: 'Revenue' },
     { id: 'agent-coaching', icon: Users, label: 'Agents' },
     { id: 'supervisor-alerts', icon: AlertTriangle, label: 'Alerts' },
+    { id: 'about', icon: Info, label: 'About' },
   ];
 
   return (

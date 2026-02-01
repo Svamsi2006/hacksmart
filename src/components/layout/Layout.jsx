@@ -27,6 +27,7 @@ const Layout = ({ children, activePage, setActivePage, onLogout }) => {
     'agent-coaching': 'Agent Coaching Panel',
     'city-insights': 'City Insights',
     'supervisor-alerts': 'Supervisor Alerts',
+    'about': 'What We Do - Smart-Audit AI',
   };
 
   return (

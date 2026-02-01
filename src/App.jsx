@@ -9,6 +9,7 @@ import QAAnalytics from './components/pages/QAAnalytics';
 import RevenueLeakage from './components/pages/RevenueLeakage';
 import AgentCoaching from './components/pages/AgentCoaching';
 import SupervisorAlerts from './components/pages/SupervisorAlerts';
+import AboutPage from './components/pages/AboutPage';
 import DataLoadingOverlay from './components/shared/DataLoadingOverlay';
 import LoadingScreen from './components/shared/LoadingScreen';
 import LoginScreen from './components/auth/LoginScreen';
@@ -54,6 +55,8 @@ function App() {
         return <AgentCoaching />;
       case 'supervisor-alerts':
         return <SupervisorAlerts />;
+      case 'about':
+        return <AboutPage />;
       default:
         return <Overview setActivePage={setActivePage} />;
     }
