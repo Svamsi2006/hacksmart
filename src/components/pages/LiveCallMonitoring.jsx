@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, X, Play, Pause, Download, Brain, FileAudio, MessageSquare, User, Headphones, Clock, Loader2, Filter, Volume2, VolumeX, RotateCcw, SkipBack, SkipForward, FileText, Search, Phone, FileSpreadsheet, Mail } from 'lucide-react';
+import { RefreshCw, X, Play, Pause, Download, Brain, FileAudio, MessageSquare, User, Headphones, Clock, Loader2, Filter, Volume2, VolumeX, RotateCcw, SkipBack, SkipForward, FileText, Search, Phone, FileSpreadsheet, Mail, Cpu, Sparkles, Activity } from 'lucide-react';
 import Card from '../shared/Card';
 import Badge from '../shared/Badge';
 import Button from '../shared/Button';
@@ -10,6 +10,7 @@ import { transcribeWithRetry, formatTimestamp, generateSimulatedTranscription } 
 import { generateIssueSummary } from '../../services/analyticsService';
 import { useTheme } from '../../context/ThemeContext';
 import { sendCallReportEmail } from '../../services/emailService';
+import { analyzeCallWithDistilBERT } from '../../services/distilbertService';
 
 // Helper function to extract file ID from Google Drive URL
 const extractDriveFileId = (driveUrl) => {
@@ -60,6 +61,10 @@ const LiveCallMonitoring = () => {
   const [riskFilter, setRiskFilter] = useState('all'); // 'all', 'high', 'medium', 'low'
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
+  
+  // DistilBERT AI Analysis state
+  const [distilbertAnalysis, setDistilbertAnalysis] = useState(null);
+  const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
   
   // Audio player state
   const audioRef = useRef(null);
@@ -298,8 +303,11 @@ Smart-Audit AI Dashboard
   useEffect(() => {
     if (selectedCall) {
       loadTranscription(selectedCall);
+      // Reset DistilBERT analysis when new call is selected
+      setDistilbertAnalysis(null);
     } else {
       setTranscription(null);
+      setDistilbertAnalysis(null);
     }
   }, [selectedCall]);
 
@@ -317,6 +325,44 @@ Smart-Audit AI Dashboard
       setTranscription(generateSimulatedTranscription(call.audioUrl));
     } finally {
       setIsTranscribing(false);
+    }
+  };
+
+  // DistilBERT Analysis function
+  const runDistilBERTAnalysis = async () => {
+    if (!selectedCall) return;
+    
+    setIsAnalyzingAI(true);
+    setDistilbertAnalysis(null);
+    
+    try {
+      // Create text from transcription or call data
+      let textToAnalyze = '';
+      
+      if (transcription?.segments) {
+        textToAnalyze = transcription.segments.map(s => s.text).join(' ');
+      } else if (transcription?.text) {
+        textToAnalyze = transcription.text;
+      } else {
+        // Use call metadata as fallback
+        textToAnalyze = `${selectedCall.callType || 'General inquiry'} call from agent ${selectedCall.agent || 'Unknown'} in ${selectedCall.city || 'Unknown city'}. Customer called regarding ${selectedCall.callType || 'general issue'}.`;
+      }
+      
+      console.log('🤖 Running DistilBERT analysis on:', textToAnalyze.substring(0, 100) + '...');
+      const result = await analyzeCallWithDistilBERT(textToAnalyze);
+      setDistilbertAnalysis(result);
+      console.log('✅ DistilBERT analysis complete:', result);
+    } catch (error) {
+      console.error('DistilBERT analysis failed:', error);
+      setDistilbertAnalysis({ 
+        success: false, 
+        error: error.message,
+        sentiment: { label: 'neutral', confidence: 50 },
+        category: { category: 'general inquiry', confidence: 50 },
+        emotion: { emotion: 'neutral', confidence: 50 }
+      });
+    } finally {
+      setIsAnalyzingAI(false);
     }
   };
 
@@ -685,28 +731,46 @@ Smart-Audit AI Dashboard
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-gray-200">
+                <div className={`flex border-b ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
                   <button
                     onClick={() => setActiveTab('transcription')}
                     className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === 'transcription' 
                         ? 'border-teal text-teal' 
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        : `border-transparent ${isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
                     }`}
                   >
                     <MessageSquare className="w-4 h-4" />
-                    Full Transcription
+                    Transcription
                   </button>
                   <button
                     onClick={() => setActiveTab('analysis')}
                     className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === 'analysis' 
                         ? 'border-teal text-teal' 
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        : `border-transparent ${isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
                     }`}
                   >
                     <Brain className="w-4 h-4" />
-                    AI Analysis
+                    Analysis
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('distilbert');
+                      // Auto-analyze when tab is clicked
+                      if (!distilbertAnalysis && !isAnalyzingAI) {
+                        runDistilBERTAnalysis();
+                      }
+                    }}
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'distilbert' 
+                        ? 'border-violet-500 text-violet-500' 
+                        : `border-transparent ${isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+                    }`}
+                  >
+                    <Cpu className="w-4 h-4" />
+                    DistilBERT
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-violet-500 text-white rounded-full">AI</span>
                   </button>
                 </div>
 
@@ -898,6 +962,189 @@ Smart-Audit AI Dashboard
                           ))}
                         </div>
                       </div>
+                    </motion.div>
+                  )}
+
+                  {/* DistilBERT AI Analysis Tab */}
+                  {activeTab === 'distilbert' && (
+                    <motion.div
+                      key="distilbert"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="space-y-4"
+                    >
+                      {/* Header */}
+                      <div className={`flex items-center justify-between p-4 rounded-xl ${isDarkMode ? 'bg-violet-900/20' : 'bg-gradient-to-r from-violet-50 to-purple-50'} border ${isDarkMode ? 'border-violet-700' : 'border-violet-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                            <Cpu className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <p className={`font-bold ${isDarkMode ? 'text-violet-300' : 'text-violet-800'}`}>DistilBERT Analysis</p>
+                            <p className={`text-xs ${isDarkMode ? 'text-violet-400' : 'text-violet-600'}`}>Hugging Face Transformers</p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={runDistilBERTAnalysis}
+                          disabled={isAnalyzingAI}
+                          className={`${isDarkMode ? 'border-violet-600 text-violet-300' : 'border-violet-300 text-violet-700'}`}
+                        >
+                          {isAnalyzingAI ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              {distilbertAnalysis ? 'Re-Analyze' : 'Analyze'}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Loading State */}
+                      {isAnalyzingAI && (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className="relative">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 animate-pulse" />
+                            <Cpu className="w-8 h-8 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                          </div>
+                          <p className={`text-sm font-medium mt-4 ${isDarkMode ? 'text-white' : 'text-navy'}`}>Running DistilBERT Analysis...</p>
+                          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Sentiment • Classification • Emotion Detection</p>
+                        </div>
+                      )}
+
+                      {/* Results */}
+                      {!isAnalyzingAI && distilbertAnalysis && (
+                        <div className="space-y-4">
+                          {/* Sentiment Analysis */}
+                          <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+                            <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                              <Activity className="w-4 h-4 text-violet-500" />
+                              Sentiment Analysis
+                            </p>
+                            <div className="flex items-center gap-4">
+                              <div className={`px-4 py-2 rounded-lg font-bold text-lg ${
+                                distilbertAnalysis.sentiment?.label === 'positive' 
+                                  ? 'bg-emerald-100 text-emerald-700' 
+                                  : distilbertAnalysis.sentiment?.label === 'negative'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {distilbertAnalysis.sentiment?.label?.toUpperCase() || 'NEUTRAL'}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Confidence</span>
+                                  <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-navy'}`}>{distilbertAnalysis.sentiment?.confidence || 50}%</span>
+                                </div>
+                                <div className={`h-2 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-gray-200'}`}>
+                                  <div 
+                                    className={`h-2 rounded-full transition-all ${
+                                      distilbertAnalysis.sentiment?.label === 'positive' 
+                                        ? 'bg-emerald-500' 
+                                        : distilbertAnalysis.sentiment?.label === 'negative'
+                                          ? 'bg-red-500'
+                                          : 'bg-amber-500'
+                                    }`}
+                                    style={{ width: `${distilbertAnalysis.sentiment?.confidence || 50}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Call Category */}
+                          <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+                            <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                              <FileText className="w-4 h-4 text-violet-500" />
+                              Call Category (Zero-Shot Classification)
+                            </p>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-navy'}`}>
+                                  {distilbertAnalysis.category?.category || 'General Inquiry'}
+                                </span>
+                                <Badge className="bg-violet-500 text-white">
+                                  {distilbertAnalysis.category?.confidence || 50}% match
+                                </Badge>
+                              </div>
+                              {distilbertAnalysis.category?.allCategories?.slice(1, 3).map((cat, i) => (
+                                <div key={i} className={`flex items-center justify-between text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  <span>{cat.label}</span>
+                                  <span>{cat.score}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Emotion Detection */}
+                          <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+                            <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                              <Sparkles className="w-4 h-4 text-violet-500" />
+                              Emotion Detection
+                            </p>
+                            <div className="flex items-center gap-3">
+                              <span className="text-3xl">
+                                {distilbertAnalysis.emotion?.emotion === 'joy' ? '😊' :
+                                 distilbertAnalysis.emotion?.emotion === 'anger' ? '😠' :
+                                 distilbertAnalysis.emotion?.emotion === 'sadness' ? '😢' :
+                                 distilbertAnalysis.emotion?.emotion === 'fear' ? '😨' :
+                                 distilbertAnalysis.emotion?.emotion === 'surprise' ? '😮' :
+                                 distilbertAnalysis.emotion?.emotion === 'disgust' ? '🤢' : '😐'}
+                              </span>
+                              <div>
+                                <p className={`font-medium capitalize ${isDarkMode ? 'text-white' : 'text-navy'}`}>
+                                  {distilbertAnalysis.emotion?.emotion || 'Neutral'}
+                                </p>
+                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  {distilbertAnalysis.emotion?.confidence || 50}% confidence
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* AI Summary */}
+                          <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-white'} border ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+                            <p className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                              <Brain className="w-4 h-4 text-violet-500" />
+                              AI Summary
+                            </p>
+                            <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {distilbertAnalysis.summary?.summary || 'Analysis complete. View sentiment and classification results above.'}
+                            </p>
+                          </div>
+
+                          {/* Model Info */}
+                          <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-violet-900/20' : 'bg-violet-50'} text-center`}>
+                            <p className={`text-xs ${isDarkMode ? 'text-violet-400' : 'text-violet-600'}`}>
+                              Powered by <strong>Hugging Face Transformers</strong> • Models: distilbert-base-uncased, bart-large-mnli, distilroberta-emotion
+                            </p>
+                            <p className={`text-xs mt-1 ${isDarkMode ? 'text-violet-500' : 'text-violet-400'}`}>
+                              Analyzed at: {distilbertAnalysis.analyzedAt ? new Date(distilbertAnalysis.analyzedAt).toLocaleTimeString() : 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Empty State */}
+                      {!isAnalyzingAI && !distilbertAnalysis && (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className={`w-16 h-16 rounded-full ${isDarkMode ? 'bg-slate-800' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
+                            <Cpu className={`w-8 h-8 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                          </div>
+                          <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Click "Analyze" to run DistilBERT AI analysis
+                          </p>
+                          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            Uses Hugging Face Inference API (Free)
+                          </p>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>

@@ -1,11 +1,92 @@
-// AI Analysis Service - Grok + Gemini with Fallback
-// Uses xAI Grok as primary, Google Gemini as fallback
+// AI Analysis Service - DistilBERT + Grok + Gemini with Fallback
+// Uses DistilBERT (Hugging Face) as primary, Grok and Gemini as fallbacks
+
+import { analyzeCallWithDistilBERT } from './distilbertService';
 
 const GROK_API_KEY = import.meta.env.VITE_GROK_API_KEY;
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+
+/**
+ * Analyze transcript using DistilBERT (Hugging Face) - PRIMARY
+ */
+export const analyzeWithDistilBERT = async (transcript, callContext = {}) => {
+  try {
+    console.log('🤖 Analyzing with DistilBERT (Hugging Face)...');
+    const result = await analyzeCallWithDistilBERT(transcript);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'DistilBERT analysis failed');
+    }
+    
+    // Transform DistilBERT result to standard format
+    return {
+      sentiment: result.sentiment?.label || 'neutral',
+      sentimentScore: (result.sentiment?.confidence || 50) / 100,
+      sopAdherence: calculateSOPFromDistilBERT(result),
+      qaScore: calculateQAFromDistilBERT(result),
+      riskLevel: result.category?.category?.includes('stolen') || 
+                 result.category?.category?.includes('dispute') ||
+                 result.sentiment?.label === 'negative' ? 'high' :
+                 result.sentiment?.label === 'neutral' ? 'medium' : 'low',
+      summary: result.summary?.summary || 'Call analyzed successfully',
+      issues: extractIssuesFromDistilBERT(result),
+      emotion: result.emotion?.emotion || 'neutral',
+      emotionScore: result.emotion?.confidence || 50,
+      category: result.category?.category || 'general inquiry',
+      categoryConfidence: result.category?.confidence || 50,
+      entities: result.entities || {},
+      success: true,
+      aiProvider: 'distilbert',
+      model: 'DistilBERT (Hugging Face)',
+      analyzedAt: result.analyzedAt
+    };
+  } catch (error) {
+    console.error('DistilBERT analysis failed:', error);
+    throw error;
+  }
+};
+
+// Helper functions for DistilBERT analysis
+const calculateSOPFromDistilBERT = (result) => {
+  let score = 70;
+  if (result.sentiment?.label === 'positive') score += 15;
+  else if (result.sentiment?.label === 'negative') score -= 10;
+  if (result.sentiment?.confidence > 80) score += 5;
+  if (result.category?.confidence > 70) score += 10;
+  if (result.emotion?.emotion === 'joy') score += 5;
+  else if (result.emotion?.emotion === 'anger') score -= 10;
+  return Math.min(100, Math.max(0, Math.round(score)));
+};
+
+const calculateQAFromDistilBERT = (result) => {
+  let score = 75;
+  if (result.sentiment?.label === 'positive') score += 10;
+  else if (result.sentiment?.label === 'negative') score -= 15;
+  if (result.category?.confidence > 80) score += 5;
+  if (result.emotion?.emotion === 'joy' || result.emotion?.emotion === 'surprise') score += 5;
+  else if (result.emotion?.emotion === 'anger' || result.emotion?.emotion === 'disgust') score -= 10;
+  return Math.min(100, Math.max(0, Math.round(score)));
+};
+
+const extractIssuesFromDistilBERT = (result) => {
+  const issues = [];
+  if (result.sentiment?.label === 'negative') {
+    issues.push('Customer expressed dissatisfaction');
+  }
+  if (result.emotion?.emotion === 'anger') {
+    issues.push('Customer showed signs of frustration');
+  }
+  if (result.category?.category?.includes('dispute')) {
+    issues.push('Dispute or complaint detected');
+  }
+  if (result.category?.category?.includes('stolen')) {
+    issues.push('Equipment theft reported');
+  }
+  return issues.length > 0 ? issues : ['No major issues detected'];
+};
 
 /**
  * Analyze transcript using Grok API (xAI)
@@ -113,32 +194,42 @@ ${prompt}`
 };
 
 /**
- * Main analysis function with fallback
- * Tries Grok first, falls back to Gemini if Grok fails
+ * Main analysis function with fallback chain
+ * Tries DistilBERT first, then Grok, then Gemini
  */
 export const analyzeTranscript = async (transcript, callContext = {}) => {
-  // Try Grok first
+  // Try DistilBERT first (fastest, free)
   try {
-    console.log('🤖 Analyzing with Grok (xAI)...');
-    const result = await analyzeWithGrok(transcript, callContext);
-    result.aiProvider = 'grok';
-    console.log('✅ Grok analysis successful');
+    console.log('🤖 Attempting DistilBERT analysis (Hugging Face)...');
+    const result = await analyzeWithDistilBERT(transcript, callContext);
+    console.log('✅ DistilBERT analysis successful');
     return result;
-  } catch (grokError) {
-    console.warn('⚠️ Grok failed, trying Gemini fallback...', grokError.message);
+  } catch (distilbertError) {
+    console.warn('⚠️ DistilBERT failed, trying Grok...', distilbertError.message);
     
-    // Fallback to Gemini
+    // Try Grok second
     try {
-      console.log('🤖 Analyzing with Gemini...');
-      const result = await analyzeWithGemini(transcript, callContext);
-      result.aiProvider = 'gemini';
-      console.log('✅ Gemini analysis successful');
+      console.log('🤖 Analyzing with Grok (xAI)...');
+      const result = await analyzeWithGrok(transcript, callContext);
+      result.aiProvider = 'grok';
+      console.log('✅ Grok analysis successful');
       return result;
-    } catch (geminiError) {
-      console.error('❌ Both AI providers failed:', geminiError.message);
+    } catch (grokError) {
+      console.warn('⚠️ Grok failed, trying Gemini fallback...', grokError.message);
       
-      // Return fallback analysis
-      return generateFallbackAnalysis(transcript);
+      // Fallback to Gemini
+      try {
+        console.log('🤖 Analyzing with Gemini...');
+        const result = await analyzeWithGemini(transcript, callContext);
+        result.aiProvider = 'gemini';
+        console.log('✅ Gemini analysis successful');
+        return result;
+      } catch (geminiError) {
+        console.error('❌ All AI providers failed:', geminiError.message);
+        
+        // Return fallback analysis
+        return generateFallbackAnalysis(transcript);
+      }
     }
   }
 };
