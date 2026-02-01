@@ -1,332 +1,405 @@
 // DistilBERT Integration via Hugging Face Inference API
 // Free tier: 30,000 requests/month
-// Models: Sentiment, Classification, NER, QA, Summarization
+// Models: Sentiment, Classification, Emotion Detection
 
 const HF_API_KEY = import.meta.env.VITE_HUGGINGFACE_API_KEY;
 const HF_API_URL = 'https://api-inference.huggingface.co/models';
 
+// Debug logging
+const DEBUG = true;
+const log = (...args) => DEBUG && console.log('🔮 [DistilBERT]', ...args);
+const logError = (...args) => console.error('❌ [DistilBERT Error]', ...args);
+
+// Check API key on load
+if (!HF_API_KEY) {
+  console.warn('⚠️ VITE_HUGGINGFACE_API_KEY not found! DistilBERT analysis will use fallback mode.');
+}
+
 // ============================================
-// SENTIMENT ANALYSIS (DistilBERT)
+// HELPER: Make API call with retries
+// ============================================
+const callHuggingFaceAPI = async (model, payload, retries = 2) => {
+  const url = `${HF_API_URL}/${model}`;
+  
+  log(`Calling ${model}...`);
+  
+  if (!HF_API_KEY) {
+    throw new Error('No API key configured');
+  }
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${HF_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      const data = await response.json();
+      
+      // Check if model is loading
+      if (data.error && data.error.includes('loading')) {
+        log(`Model ${model} is loading, waiting 15s...`);
+        await new Promise(r => setTimeout(r, 15000));
+        continue;
+      }
+      
+      // Check for other errors
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
+      }
+      
+      log(`${model} response:`, data);
+      return data;
+      
+    } catch (error) {
+      logError(`Attempt ${attempt + 1} failed for ${model}:`, error.message);
+      if (attempt === retries) throw error;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+};
+
+// ============================================
+// SENTIMENT ANALYSIS (DistilBERT SST-2)
 // ============================================
 export const analyzeSentiment = async (text) => {
   if (!text || text.length < 5) {
-    return { label: 'neutral', confidence: 50, error: 'Text too short' };
+    return { label: 'neutral', confidence: 50, error: 'Text too short', isDefault: true };
   }
 
   try {
-    const response = await fetch(
-      `${HF_API_URL}/distilbert-base-uncased-finetuned-sst-2-english`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${HF_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ inputs: text.substring(0, 512) }), // Max 512 tokens
-      }
+    const result = await callHuggingFaceAPI(
+      'distilbert-base-uncased-finetuned-sst-2-english',
+      { inputs: text.substring(0, 512) }
     );
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    // Handle loading state (model warming up)
-    if (result.error && result.error.includes('loading')) {
-      await new Promise(resolve => setTimeout(resolve, 20000)); // Wait 20s for model to load
-      return analyzeSentiment(text); // Retry
-    }
-    
-    // Result format: [[{ label: "POSITIVE", score: 0.95 }, { label: "NEGATIVE", score: 0.05 }]]
+    // Result: [[{label: "POSITIVE", score: 0.95}, {label: "NEGATIVE", score: 0.05}]]
     const predictions = Array.isArray(result[0]) ? result[0] : result;
-    const sentiment = predictions?.reduce((a, b) => (a?.score > b?.score ? a : b), predictions[0]);
+    
+    if (!predictions || predictions.length === 0) {
+      throw new Error('Empty predictions');
+    }
+    
+    // Find highest scoring sentiment
+    const sorted = [...predictions].sort((a, b) => b.score - a.score);
+    const top = sorted[0];
+    
+    const label = top.label?.toUpperCase() === 'POSITIVE' ? 'positive' : 
+                  top.label?.toUpperCase() === 'NEGATIVE' ? 'negative' : 'neutral';
+    
+    log(`Sentiment result: ${label} (${Math.round(top.score * 100)}%)`);
     
     return {
-      label: sentiment?.label?.toLowerCase() === 'positive' ? 'positive' : 
-             sentiment?.label?.toLowerCase() === 'negative' ? 'negative' : 'neutral',
-      confidence: Math.round((sentiment?.score || 0.5) * 100),
-      raw: result,
-      model: 'distilbert-base-uncased-finetuned-sst-2-english'
+      label,
+      confidence: Math.round(top.score * 100),
+      allResults: sorted.map(p => ({ label: p.label, score: Math.round(p.score * 100) })),
+      model: 'distilbert-base-uncased-finetuned-sst-2-english',
+      isDefault: false
     };
   } catch (error) {
-    console.error('DistilBERT sentiment error:', error);
-    return { label: 'neutral', confidence: 50, error: error.message };
+    logError('Sentiment analysis failed:', error.message);
+    // Return intelligent fallback based on text content
+    return analyzeSentimentFallback(text);
   }
 };
 
+// Fallback sentiment analysis using keyword matching
+const analyzeSentimentFallback = (text) => {
+  const lower = text.toLowerCase();
+  
+  const positiveWords = ['thank', 'thanks', 'great', 'good', 'excellent', 'happy', 'satisfied', 'helpful', 'resolved', 'appreciate', 'perfect', 'awesome', 'wonderful'];
+  const negativeWords = ['angry', 'upset', 'frustrated', 'complaint', 'stolen', 'theft', 'problem', 'issue', 'not working', 'failed', 'terrible', 'worst', 'disappointed', 'furious', 'hate', 'bad', 'poor'];
+  
+  let positiveScore = 0;
+  let negativeScore = 0;
+  
+  positiveWords.forEach(word => {
+    if (lower.includes(word)) positiveScore += 15;
+  });
+  
+  negativeWords.forEach(word => {
+    if (lower.includes(word)) negativeScore += 15;
+  });
+  
+  // Check for specific issue types
+  if (lower.includes('stolen') || lower.includes('theft') || lower.includes('meter stolen')) {
+    negativeScore += 30;
+  }
+  if (lower.includes('less range') || lower.includes('battery not') || lower.includes('complaint')) {
+    negativeScore += 25;
+  }
+  if (lower.includes('penalty') || lower.includes('dispute')) {
+    negativeScore += 20;
+  }
+  if (lower.includes('swap information') || lower.includes('subscription inquiry')) {
+    positiveScore += 10;
+  }
+  
+  const total = positiveScore + negativeScore;
+  let label = 'neutral';
+  let confidence = 60;
+  
+  if (total > 0) {
+    if (positiveScore > negativeScore) {
+      label = 'positive';
+      confidence = Math.min(95, 50 + positiveScore);
+    } else if (negativeScore > positiveScore) {
+      label = 'negative';
+      confidence = Math.min(95, 50 + negativeScore);
+    }
+  }
+  
+  log(`Fallback sentiment: ${label} (${confidence}%)`);
+  
+  return {
+    label,
+    confidence,
+    model: 'keyword-fallback',
+    isDefault: true
+  };
+};
+
 // ============================================
-// TEXT CLASSIFICATION (Zero-shot)
+// TEXT CLASSIFICATION (Zero-shot BART-MNLI)
 // ============================================
 export const classifyCallType = async (text) => {
   if (!text || text.length < 10) {
-    return { category: 'general inquiry', confidence: 50, error: 'Text too short' };
+    return { category: 'general inquiry', confidence: 50, error: 'Text too short', isDefault: true };
   }
 
+  const candidateLabels = [
+    'battery range complaint',
+    'penalty dispute',
+    'swap issue',
+    'payment query',
+    'technical fault',
+    'meter or equipment stolen',
+    'subscription inquiry',
+    'general information request'
+  ];
+
   try {
-    const response = await fetch(
-      `${HF_API_URL}/facebook/bart-large-mnli`,
+    const result = await callHuggingFaceAPI(
+      'facebook/bart-large-mnli',
       {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${HF_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: text.substring(0, 1000),
-          parameters: {
-            candidate_labels: [
-              'battery range complaint',
-              'penalty dispute',
-              'swap issue',
-              'payment query',
-              'technical fault',
-              'equipment stolen',
-              'subscription inquiry',
-              'general information'
-            ]
-          }
-        }),
+        inputs: text.substring(0, 1000),
+        parameters: { candidate_labels: candidateLabels }
       }
     );
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+    if (!result.labels || result.labels.length === 0) {
+      throw new Error('No classification results');
     }
     
-    const result = await response.json();
-    
-    // Handle loading state
-    if (result.error && result.error.includes('loading')) {
-      await new Promise(resolve => setTimeout(resolve, 30000));
-      return classifyCallType(text);
-    }
+    log(`Classification: ${result.labels[0]} (${Math.round(result.scores[0] * 100)}%)`);
     
     return {
-      category: result.labels?.[0] || 'general inquiry',
-      confidence: Math.round((result.scores?.[0] || 0.5) * 100),
-      allCategories: result.labels?.slice(0, 3).map((label, i) => ({
+      category: result.labels[0],
+      confidence: Math.round(result.scores[0] * 100),
+      allCategories: result.labels.slice(0, 5).map((label, i) => ({
         label,
-        score: Math.round((result.scores?.[i] || 0) * 100)
+        score: Math.round(result.scores[i] * 100)
       })),
-      model: 'facebook/bart-large-mnli'
+      model: 'facebook/bart-large-mnli',
+      isDefault: false
     };
   } catch (error) {
-    console.error('Classification error:', error);
-    return { category: 'general inquiry', confidence: 50, error: error.message };
+    logError('Classification failed:', error.message);
+    return classifyCallTypeFallback(text);
   }
 };
 
-// ============================================
-// NAMED ENTITY RECOGNITION
-// ============================================
-export const extractEntities = async (text) => {
-  if (!text || text.length < 10) {
-    return { persons: [], locations: [], organizations: [], misc: [] };
-  }
-
-  try {
-    const response = await fetch(
-      `${HF_API_URL}/dbmdz/bert-large-cased-finetuned-conll03-english`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${HF_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ inputs: text.substring(0, 512) }),
+// Fallback classification using keyword matching
+const classifyCallTypeFallback = (text) => {
+  const lower = text.toLowerCase();
+  
+  const categories = [
+    { keywords: ['stolen', 'theft', 'meter stolen', 'equipment stolen'], category: 'meter or equipment stolen', weight: 0 },
+    { keywords: ['less range', 'battery not lasting', 'range complaint', 'only 15 km', 'range issue'], category: 'battery range complaint', weight: 0 },
+    { keywords: ['penalty', 'fine', 'charge', 'waiver', 'dispute'], category: 'penalty dispute', weight: 0 },
+    { keywords: ['swap', 'station', 'swap issue', 'machine'], category: 'swap issue', weight: 0 },
+    { keywords: ['payment', 'billing', 'invoice', 'pay'], category: 'payment query', weight: 0 },
+    { keywords: ['technical', 'fault', 'not working', 'broken', 'error'], category: 'technical fault', weight: 0 },
+    { keywords: ['subscription', 'plan', 'monthly', 'unlimited'], category: 'subscription inquiry', weight: 0 },
+    { keywords: ['information', 'how to', 'what is', 'tell me'], category: 'general information request', weight: 0 }
+  ];
+  
+  categories.forEach(cat => {
+    cat.keywords.forEach(keyword => {
+      if (lower.includes(keyword)) {
+        cat.weight += 20;
       }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    if (result.error) {
-      throw new Error(result.error);
-    }
-    
-    // Group entities by type
-    const entities = {
-      persons: [],
-      locations: [],
-      organizations: [],
-      misc: []
-    };
-    
-    if (Array.isArray(result)) {
-      result.forEach(entity => {
-        const type = entity.entity_group?.toUpperCase() || entity.entity?.toUpperCase();
-        const word = entity.word?.replace(/^##/, '') || '';
-        
-        if (type?.includes('PER')) entities.persons.push(word);
-        else if (type?.includes('LOC')) entities.locations.push(word);
-        else if (type?.includes('ORG')) entities.organizations.push(word);
-        else if (word) entities.misc.push(word);
-      });
-    }
-    
-    // Deduplicate
-    entities.persons = [...new Set(entities.persons)];
-    entities.locations = [...new Set(entities.locations)];
-    entities.organizations = [...new Set(entities.organizations)];
-    entities.misc = [...new Set(entities.misc)];
-    
-    return { ...entities, model: 'bert-large-cased-finetuned-conll03-english' };
-  } catch (error) {
-    console.error('NER error:', error);
-    return { persons: [], locations: [], organizations: [], misc: [], error: error.message };
-  }
+    });
+  });
+  
+  // Sort by weight
+  categories.sort((a, b) => b.weight - a.weight);
+  
+  const topCategory = categories[0].weight > 0 ? categories[0] : { category: 'general information request', weight: 40 };
+  const confidence = Math.min(90, 50 + topCategory.weight);
+  
+  log(`Fallback classification: ${topCategory.category} (${confidence}%)`);
+  
+  return {
+    category: topCategory.category,
+    confidence,
+    allCategories: categories.slice(0, 5).map(c => ({
+      label: c.category,
+      score: Math.max(10, Math.min(90, 40 + c.weight))
+    })),
+    model: 'keyword-fallback',
+    isDefault: true
+  };
 };
 
 // ============================================
-// QUESTION ANSWERING (For chatbot)
-// ============================================
-export const answerQuestion = async (question, context) => {
-  if (!question || !context) {
-    return { answer: 'Please provide both question and context', confidence: 0 };
-  }
-
-  try {
-    const response = await fetch(
-      `${HF_API_URL}/distilbert-base-cased-distilled-squad`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${HF_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: {
-            question: question,
-            context: context.substring(0, 1000)
-          }
-        }),
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    return {
-      answer: result.answer || 'No answer found',
-      confidence: Math.round((result.score || 0) * 100),
-      start: result.start,
-      end: result.end,
-      model: 'distilbert-base-cased-distilled-squad'
-    };
-  } catch (error) {
-    console.error('QA error:', error);
-    return { answer: 'Unable to process question', confidence: 0, error: error.message };
-  }
-};
-
-// ============================================
-// TEXT SUMMARIZATION
-// ============================================
-export const summarizeText = async (text, maxLength = 60) => {
-  if (!text || text.length < 50) {
-    return { summary: text || '', error: 'Text too short for summarization' };
-  }
-
-  try {
-    const response = await fetch(
-      `${HF_API_URL}/sshleifer/distilbart-cnn-12-6`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${HF_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: text.substring(0, 1024),
-          parameters: {
-            max_length: maxLength,
-            min_length: 15,
-            do_sample: false
-          }
-        }),
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    // Handle loading state
-    if (result.error && result.error.includes('loading')) {
-      await new Promise(resolve => setTimeout(resolve, 30000));
-      return summarizeText(text, maxLength);
-    }
-    
-    return {
-      summary: result[0]?.summary_text || text.substring(0, 100) + '...',
-      originalLength: text.length,
-      summaryLength: result[0]?.summary_text?.length || 0,
-      model: 'distilbart-cnn-12-6'
-    };
-  } catch (error) {
-    console.error('Summarization error:', error);
-    return { summary: text.substring(0, 100) + '...', error: error.message };
-  }
-};
-
-// ============================================
-// EMOTION DETECTION (Bonus)
+// EMOTION DETECTION (DistilRoBERTa)
 // ============================================
 export const detectEmotion = async (text) => {
   if (!text || text.length < 10) {
-    return { emotion: 'neutral', confidence: 50 };
+    return { emotion: 'neutral', confidence: 50, isDefault: true };
   }
 
   try {
-    const response = await fetch(
-      `${HF_API_URL}/j-hartmann/emotion-english-distilroberta-base`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${HF_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ inputs: text.substring(0, 512) }),
-      }
+    const result = await callHuggingFaceAPI(
+      'j-hartmann/emotion-english-distilroberta-base',
+      { inputs: text.substring(0, 512) }
     );
     
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    // Result: [[{label: "anger", score: 0.5}, {label: "joy", score: 0.3}, ...]]
+    const emotions = Array.isArray(result[0]) ? result[0] : result;
+    
+    if (!emotions || emotions.length === 0) {
+      throw new Error('No emotion results');
     }
     
-    const result = await response.json();
+    const sorted = [...emotions].sort((a, b) => b.score - a.score);
+    const topEmotion = sorted[0];
     
-    const emotions = Array.isArray(result[0]) ? result[0] : result;
-    const topEmotion = emotions?.reduce((a, b) => (a?.score > b?.score ? a : b), emotions[0]);
+    log(`Emotion: ${topEmotion.label} (${Math.round(topEmotion.score * 100)}%)`);
     
     return {
-      emotion: topEmotion?.label || 'neutral',
-      confidence: Math.round((topEmotion?.score || 0.5) * 100),
-      allEmotions: emotions?.slice(0, 5).map(e => ({
+      emotion: topEmotion.label,
+      confidence: Math.round(topEmotion.score * 100),
+      allEmotions: sorted.map(e => ({
         label: e.label,
-        score: Math.round((e.score || 0) * 100)
+        score: Math.round(e.score * 100)
       })),
-      model: 'emotion-english-distilroberta-base'
+      model: 'emotion-english-distilroberta-base',
+      isDefault: false
     };
   } catch (error) {
-    console.error('Emotion detection error:', error);
-    return { emotion: 'neutral', confidence: 50, error: error.message };
+    logError('Emotion detection failed:', error.message);
+    return detectEmotionFallback(text);
   }
 };
 
+// Fallback emotion detection
+const detectEmotionFallback = (text) => {
+  const lower = text.toLowerCase();
+  
+  const emotionKeywords = {
+    anger: ['angry', 'furious', 'upset', 'frustrated', 'mad', 'annoyed', 'irritated'],
+    joy: ['happy', 'great', 'wonderful', 'excellent', 'thank', 'appreciate', 'satisfied'],
+    sadness: ['sad', 'disappointed', 'unhappy', 'sorry', 'regret'],
+    fear: ['worried', 'scared', 'afraid', 'anxious', 'concerned'],
+    surprise: ['surprised', 'shocked', 'unexpected', 'wow', 'amazing'],
+    disgust: ['disgusting', 'terrible', 'horrible', 'awful', 'worst']
+  };
+  
+  const scores = {};
+  Object.keys(emotionKeywords).forEach(emotion => {
+    scores[emotion] = 0;
+    emotionKeywords[emotion].forEach(keyword => {
+      if (lower.includes(keyword)) {
+        scores[emotion] += 25;
+      }
+    });
+  });
+  
+  // Check issue types for emotion hints
+  if (lower.includes('stolen') || lower.includes('theft')) {
+    scores.anger = (scores.anger || 0) + 30;
+    scores.fear = (scores.fear || 0) + 20;
+  }
+  if (lower.includes('complaint') || lower.includes('problem')) {
+    scores.anger = (scores.anger || 0) + 20;
+  }
+  if (lower.includes('resolved') || lower.includes('thank')) {
+    scores.joy = (scores.joy || 0) + 25;
+  }
+  
+  // Find top emotion
+  let topEmotion = 'neutral';
+  let topScore = 0;
+  
+  Object.entries(scores).forEach(([emotion, score]) => {
+    if (score > topScore) {
+      topEmotion = emotion;
+      topScore = score;
+    }
+  });
+  
+  const confidence = topScore > 0 ? Math.min(90, 50 + topScore) : 55;
+  
+  log(`Fallback emotion: ${topEmotion} (${confidence}%)`);
+  
+  // Build allEmotions array
+  const allEmotions = Object.entries(scores)
+    .map(([label, score]) => ({ label, score: Math.max(5, Math.min(90, 30 + score)) }))
+    .sort((a, b) => b.score - a.score);
+  
+  if (topEmotion === 'neutral') {
+    allEmotions.unshift({ label: 'neutral', score: confidence });
+  }
+  
+  return {
+    emotion: topEmotion,
+    confidence,
+    allEmotions: allEmotions.slice(0, 6),
+    model: 'keyword-fallback',
+    isDefault: true
+  };
+};
+
 // ============================================
-// COMPLETE CALL ANALYSIS (All models combined)
+// GENERATE INTELLIGENT SUMMARY
+// ============================================
+const generateSmartSummary = (text, sentiment, category, emotion) => {
+  const sentimentText = sentiment.label === 'positive' 
+    ? 'Customer expressed satisfaction during the call.'
+    : sentiment.label === 'negative'
+      ? 'Customer expressed frustration or dissatisfaction.'
+      : 'Customer maintained a neutral tone throughout.';
+  
+  const categoryText = {
+    'battery range complaint': 'Customer reported battery range issues after swap.',
+    'penalty dispute': 'Customer disputed penalty charges and requested clarification.',
+    'swap issue': 'Customer experienced problems with battery swap process.',
+    'payment query': 'Customer inquired about payment or billing details.',
+    'technical fault': 'Customer reported technical issues with equipment.',
+    'meter or equipment stolen': 'Customer reported stolen meter or equipment - urgent security concern.',
+    'subscription inquiry': 'Customer asked about subscription plans.',
+    'general information request': 'Customer requested general information about services.'
+  }[category.category] || `Customer called regarding: ${category.category}`;
+  
+  const emotionText = emotion.emotion !== 'neutral' 
+    ? `Primary emotion detected: ${emotion.emotion} (${emotion.confidence}% confidence).`
+    : '';
+  
+  return `${categoryText} ${sentimentText} ${emotionText}`.trim();
+};
+
+// ============================================
+// MAIN ANALYSIS FUNCTION
 // ============================================
 export const analyzeCallWithDistilBERT = async (transcription, options = {}) => {
   const text = typeof transcription === 'string' 
@@ -338,86 +411,74 @@ export const analyzeCallWithDistilBERT = async (transcription, options = {}) => 
     return {
       success: false,
       error: 'Insufficient text for analysis',
-      sentiment: { label: 'neutral', confidence: 50 },
-      category: { category: 'general inquiry', confidence: 50 },
-      summary: { summary: 'No transcription available' },
-      entities: { persons: [], locations: [], organizations: [], misc: [] },
-      emotion: { emotion: 'neutral', confidence: 50 }
+      sentiment: { label: 'neutral', confidence: 50, isDefault: true },
+      category: { category: 'general inquiry', confidence: 50, isDefault: true },
+      emotion: { emotion: 'neutral', confidence: 50, isDefault: true },
+      summary: { summary: 'No transcription available for analysis.' }
     };
   }
   
-  console.log('🤖 Analyzing with DistilBERT...', { textLength: text.length });
+  log(`Starting analysis on ${text.length} characters...`);
+  log(`API Key present: ${!!HF_API_KEY}`);
   
   try {
-    // Run analyses in parallel for speed (but handle failures gracefully)
-    const [sentiment, category, emotion] = await Promise.allSettled([
+    // Run all analyses in parallel
+    const [sentimentResult, categoryResult, emotionResult] = await Promise.all([
       analyzeSentiment(text),
       classifyCallType(text),
       detectEmotion(text)
     ]);
     
-    // Extract results or use defaults
-    const sentimentResult = sentiment.status === 'fulfilled' ? sentiment.value : { label: 'neutral', confidence: 50 };
-    const categoryResult = category.status === 'fulfilled' ? category.value : { category: 'general inquiry', confidence: 50 };
-    const emotionResult = emotion.status === 'fulfilled' ? emotion.value : { emotion: 'neutral', confidence: 50 };
+    // Generate smart summary
+    const summaryText = generateSmartSummary(text, sentimentResult, categoryResult, emotionResult);
     
-    // Generate summary from classification instead of calling another API to save quota
-    const summaryText = generateLocalSummary(text, categoryResult.category, sentimentResult.label);
+    // Determine if we used real API or fallback
+    const usedAPI = !sentimentResult.isDefault || !categoryResult.isDefault || !emotionResult.isDefault;
+    
+    log('Analysis complete!', {
+      sentiment: sentimentResult.label,
+      category: categoryResult.category,
+      emotion: emotionResult.emotion,
+      usedAPI
+    });
     
     return {
       success: true,
       sentiment: sentimentResult,
       category: categoryResult,
       emotion: emotionResult,
-      summary: { summary: summaryText, model: 'local-generation' },
-      entities: await extractEntities(text).catch(() => ({ persons: [], locations: [], organizations: [], misc: [] })),
-      provider: 'DistilBERT (Hugging Face)',
+      summary: { summary: summaryText, model: usedAPI ? 'huggingface' : 'fallback' },
+      provider: usedAPI ? 'Hugging Face Inference API' : 'Intelligent Fallback (Keyword Analysis)',
       analyzedAt: new Date().toISOString(),
-      textLength: text.length
+      textLength: text.length,
+      usedAPI
     };
   } catch (error) {
-    console.error('DistilBERT analysis error:', error);
+    logError('Analysis failed:', error);
+    
+    // Run fallback analysis
+    const sentimentResult = analyzeSentimentFallback(text);
+    const categoryResult = classifyCallTypeFallback(text);
+    const emotionResult = detectEmotionFallback(text);
+    const summaryText = generateSmartSummary(text, sentimentResult, categoryResult, emotionResult);
+    
     return {
-      success: false,
-      error: error.message,
-      sentiment: { label: 'neutral', confidence: 50 },
-      category: { category: 'general inquiry', confidence: 50 },
-      summary: { summary: 'Analysis failed' },
-      entities: { persons: [], locations: [], organizations: [], misc: [] },
-      emotion: { emotion: 'neutral', confidence: 50 }
+      success: true,
+      sentiment: sentimentResult,
+      category: categoryResult,
+      emotion: emotionResult,
+      summary: { summary: summaryText, model: 'fallback' },
+      provider: 'Intelligent Fallback (API Error)',
+      analyzedAt: new Date().toISOString(),
+      textLength: text.length,
+      usedAPI: false,
+      error: error.message
     };
   }
 };
 
 // ============================================
-// LOCAL SUMMARY GENERATION (Saves API calls)
-// ============================================
-const generateLocalSummary = (text, category, sentiment) => {
-  const categoryDescriptions = {
-    'battery range complaint': 'Customer reported battery range issue after swap',
-    'penalty dispute': 'Customer disputed penalty charges and requested clarification',
-    'swap issue': 'Customer experienced problems with battery swap process',
-    'payment query': 'Customer inquired about payment or billing details',
-    'technical fault': 'Customer reported technical issues with equipment',
-    'equipment stolen': 'Customer reported stolen meter/equipment',
-    'subscription inquiry': 'Customer asked about subscription plans',
-    'general information': 'Customer requested general information about services'
-  };
-  
-  const sentimentSuffix = {
-    'positive': 'Issue was resolved satisfactorily.',
-    'negative': 'Customer expressed dissatisfaction.',
-    'neutral': 'Standard interaction.'
-  };
-  
-  const description = categoryDescriptions[category] || 'Customer call processed';
-  const suffix = sentimentSuffix[sentiment] || '';
-  
-  return `${description}. ${suffix}`.trim();
-};
-
-// ============================================
-// BATCH ANALYSIS (Multiple calls)
+// BATCH ANALYSIS
 // ============================================
 export const batchAnalyzeWithDistilBERT = async (calls, onProgress) => {
   const results = [];
@@ -427,7 +488,6 @@ export const batchAnalyzeWithDistilBERT = async (calls, onProgress) => {
     const call = calls[i];
     
     try {
-      // Create text from call data
       const text = call.transcription?.segments?.map(s => s.text).join(' ') ||
                    call.transcription?.text ||
                    call.description ||
@@ -439,14 +499,14 @@ export const batchAnalyzeWithDistilBERT = async (calls, onProgress) => {
         ...call,
         distilbertAnalysis: analysis,
         sentiment: analysis.sentiment?.label || call.sentiment,
-        riskLevel: calculateRiskFromAnalysis(analysis)
+        riskLevel: analysis.sentiment?.label === 'negative' ? 'high' : 
+                   analysis.sentiment?.label === 'positive' ? 'low' : 'medium'
       });
     } catch (error) {
-      console.error(`Failed to analyze call ${call.id}:`, error);
+      logError(`Failed to analyze call ${call.id}:`, error);
       results.push(call);
     }
     
-    // Update progress
     if (onProgress) {
       onProgress({
         current: i + 1,
@@ -455,47 +515,18 @@ export const batchAnalyzeWithDistilBERT = async (calls, onProgress) => {
       });
     }
     
-    // Rate limiting: small delay between calls
+    // Rate limiting
     if (i < calls.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
   }
   
   return results;
 };
 
-// ============================================
-// RISK CALCULATION FROM ANALYSIS
-// ============================================
-const calculateRiskFromAnalysis = (analysis) => {
-  const sentiment = analysis.sentiment?.label || 'neutral';
-  const sentimentConfidence = analysis.sentiment?.confidence || 50;
-  const emotion = analysis.emotion?.emotion || 'neutral';
-  const category = analysis.category?.category || '';
-  
-  // High risk indicators
-  const highRiskCategories = ['equipment stolen', 'penalty dispute', 'technical fault'];
-  const highRiskEmotions = ['anger', 'fear', 'disgust'];
-  
-  if (highRiskCategories.some(c => category.includes(c))) return 'high';
-  if (sentiment === 'negative' && sentimentConfidence > 75) return 'high';
-  if (highRiskEmotions.includes(emotion)) return 'high';
-  
-  if (sentiment === 'negative') return 'medium';
-  if (emotion === 'sadness') return 'medium';
-  
-  return 'low';
-};
-
-// ============================================
-// EXPORT ALL FUNCTIONS
-// ============================================
 export default {
   analyzeSentiment,
   classifyCallType,
-  extractEntities,
-  answerQuestion,
-  summarizeText,
   detectEmotion,
   analyzeCallWithDistilBERT,
   batchAnalyzeWithDistilBERT
