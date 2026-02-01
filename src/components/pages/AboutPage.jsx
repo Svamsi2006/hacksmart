@@ -42,7 +42,7 @@ const AboutPage = () => {
     { name: 'BART-MNLI', purpose: 'Call Classification', icon: '📊' },
     { name: 'DistilRoBERTa', purpose: 'Emotion Detection', icon: '😊' },
     { name: 'Deepgram API', purpose: 'Hindi/English Transcription', icon: '🎤' },
-    { name: 'Grok + Gemini', purpose: 'AI Fallback Chain', icon: '🧠' },
+    { name: 'Google Sheets', purpose: 'Live Data Source', icon: '📋' },
     { name: 'Vercel', purpose: 'Global CDN Deploy', icon: '🚀' },
   ];
 
@@ -92,8 +92,7 @@ const AboutPage = () => {
   const apiCosts = [
     { service: 'Hugging Face', plan: 'FREE', limit: '30K requests/mo', cost: '₹0' },
     { service: 'Deepgram', plan: 'FREE', limit: '200 hours/mo', cost: '₹0' },
-    { service: 'Grok (xAI)', plan: 'FREE', limit: 'Rate limited', cost: '₹0' },
-    { service: 'Gemini', plan: 'FREE', limit: '60 req/min', cost: '₹0' },
+    { service: 'Google Sheets API', plan: 'FREE', limit: 'Unlimited', cost: '₹0' },
     { service: 'Vercel', plan: 'Hobby', limit: 'Unlimited', cost: '₹0' },
   ];
 
@@ -280,7 +279,7 @@ const AboutPage = () => {
           </div>
           <div className="mt-4 text-center">
             <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              Fallback Chain: DistilBERT → Grok API → Gemini API → Keyword Analysis
+              AI Pipeline: DistilBERT → BART-MNLI → DistilRoBERTa → Keyword Fallback
             </p>
           </div>
         </Card>
@@ -397,7 +396,7 @@ const AboutPage = () => {
             🚀 Built for Battery Smart Hackathon 2026
           </p>
           <p className={`text-sm mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            Powered by React • Tailwind • Hugging Face • Deepgram • Grok • Gemini
+            Powered by React • Tailwind • Hugging Face • Deepgram • Google Sheets
           </p>
           <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
             Live Demo: hacksmart-rho.vercel.app | GitHub: Gundavenkatasai/hacksmart
