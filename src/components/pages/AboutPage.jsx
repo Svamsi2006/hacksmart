@@ -43,7 +43,7 @@ const AboutPage = () => {
     { name: 'DistilRoBERTa', purpose: 'Emotion Detection', icon: '😊' },
     { name: 'Deepgram API', purpose: 'Hindi/English Transcription', icon: '🎤' },
     { name: 'Google Sheets', purpose: 'Live Data Source', icon: '📋' },
-    { name: 'Vercel', purpose: 'Global CDN Deploy', icon: '🚀' },
+    { name: 'AWS Amplify', purpose: 'Global CDN Deploy', icon: '🚀' },
   ];
 
   // Features
@@ -93,7 +93,7 @@ const AboutPage = () => {
     { service: 'Hugging Face', plan: 'FREE', limit: '30K requests/mo', cost: '₹0' },
     { service: 'Deepgram', plan: 'FREE', limit: '200 hours/mo', cost: '₹0' },
     { service: 'Google Sheets API', plan: 'FREE', limit: 'Unlimited', cost: '₹0' },
-    { service: 'Vercel', plan: 'Hobby', limit: 'Unlimited', cost: '₹0' },
+    { service: 'AWS Amplify', plan: 'Free Tier', limit: '1000 build mins/mo', cost: '₹0' },
   ];
 
   return (
@@ -396,10 +396,10 @@ const AboutPage = () => {
             🚀 Built for Battery Smart Hackathon 2026
           </p>
           <p className={`text-sm mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            Powered by React • Tailwind • Hugging Face • Deepgram • Google Sheets
+            Powered by React • Tailwind • Hugging Face • Deepgram • AWS Amplify
           </p>
           <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-            Live Demo: hacksmart-rho.vercel.app | GitHub: Gundavenkatasai/hacksmart
+            Live Demo: main.dtpjkbvb4u68s.amplifyapp.com | GitHub: Gundavenkatasai/hacksmart
           </p>
         </div>
       </motion.div>
