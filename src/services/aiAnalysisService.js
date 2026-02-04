@@ -615,13 +615,32 @@ const generateKeywordBasedAnalysis = (text) => {
     sentimentScore = 0.3 - (negativeCount * 0.05);
   }
   
+  // Generate summary DIRECTLY from actual transcript content
+  const generateSummaryFromText = (content) => {
+    // Clean and prepare the text
+    const cleanText = content.replace(/\s+/g, ' ').trim();
+    
+    // Remove speaker labels and extract actual conversation
+    const conversationText = cleanText
+      .replace(/^(Agent|Customer|Speaker\s*\d*|Rep|Caller|Support|User)[\s:]+/gim, '')
+      .trim();
+    
+    // Use actual conversation content (up to 350 chars)
+    if (conversationText.length > 350) {
+      // Find a good breakpoint
+      const breakPoint = conversationText.substring(0, 400).lastIndexOf('.');
+      return conversationText.substring(0, breakPoint > 200 ? breakPoint + 1 : 350).trim();
+    }
+    return conversationText;
+  };
+  
   return {
     sentiment,
     sentimentScore: Math.max(0, Math.min(1, sentimentScore)),
     sopAdherence: 75,
     qaScore: 75,
     riskLevel: sentiment === 'negative' ? 'high' : 'medium',
-    summary: 'Call analyzed using keyword detection.',
+    summary: generateSummaryFromText(text),
     issues: negativeCount > 0 ? ['Potential customer dissatisfaction detected'] : [],
     sopDetails: generateDefaultSOPDetails(),
     coachingRecommendations: ['Review call handling procedures'],
@@ -630,6 +649,7 @@ const generateKeywordBasedAnalysis = (text) => {
     escalationNeeded: negativeCount >= 2,
     revenueImpact: 'neutral',
     analyzedAt: new Date().toISOString(),
+    originalTranscription: text
   };
 };
 
@@ -637,7 +657,6 @@ const generateKeywordBasedAnalysis = (text) => {
  * Generate fallback analysis when both AIs fail
  */
 const generateFallbackAnalysis = (transcript) => {
-  const wordCount = transcript.split(/\s+/).length;
   const hasNegativeIndicators = /angry|frustrated|complaint|cancel|refund|terrible|worst/i.test(transcript);
   const hasPositiveIndicators = /thank|great|excellent|helpful|appreciate|wonderful/i.test(transcript);
   
@@ -652,13 +671,32 @@ const generateFallbackAnalysis = (transcript) => {
     qaScore = 60;
   }
   
+  // Generate summary DIRECTLY from actual transcript content
+  const generateSummaryFromTranscript = (text) => {
+    // Clean and prepare the text
+    const cleanText = text.replace(/\s+/g, ' ').trim();
+    
+    // Remove speaker labels and extract actual conversation
+    const conversationText = cleanText
+      .replace(/^(Agent|Customer|Speaker\s*\d*|Rep|Caller|Support|User)[\s:]+/gim, '')
+      .trim();
+    
+    // Use actual conversation content (up to 400 chars)
+    if (conversationText.length > 400) {
+      // Find a good breakpoint at sentence end
+      const breakPoint = conversationText.substring(0, 450).lastIndexOf('.');
+      return conversationText.substring(0, breakPoint > 200 ? breakPoint + 1 : 400).trim();
+    }
+    return conversationText;
+  };
+  
   return {
     sentiment,
     sentimentScore: sentiment === 'positive' ? 0.8 : sentiment === 'negative' ? 0.3 : 0.5,
     sopAdherence: qaScore,
     qaScore,
     riskLevel: sentiment === 'negative' ? 'high' : 'low',
-    summary: `Call with ${wordCount} words analyzed. ${sentiment.charAt(0).toUpperCase() + sentiment.slice(1)} customer interaction.`,
+    summary: generateSummaryFromTranscript(transcript),
     issues: hasNegativeIndicators ? ['Customer frustration detected'] : [],
     sopDetails: generateDefaultSOPDetails(),
     coachingRecommendations: qaScore < 70 ? ['Review call handling best practices'] : ['Keep up the good work!'],
