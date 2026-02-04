@@ -371,50 +371,106 @@ const detectEmotionFallback = (text) => {
 };
 
 // ============================================
-// GENERATE INTELLIGENT SUMMARY
+// GENERATE SUMMARY DIRECTLY FROM TRANSCRIPTION
 // ============================================
 const generateSmartSummary = (text, sentiment, category, emotion) => {
-  const sentimentText = sentiment.label === 'positive' 
-    ? 'Customer expressed satisfaction during the call.'
-    : sentiment.label === 'negative'
-      ? 'Customer expressed frustration or dissatisfaction.'
-      : 'Customer maintained a neutral tone throughout.';
+  // Clean up the transcription text
+  const cleanText = text.replace(/\s+/g, ' ').trim().toLowerCase();
   
-  const categoryText = {
-    'battery range complaint': 'Customer reported battery range issues after swap.',
-    'penalty dispute': 'Customer disputed penalty charges and requested clarification.',
-    'swap issue': 'Customer experienced problems with battery swap process.',
-    'payment query': 'Customer inquired about payment or billing details.',
-    'technical fault': 'Customer reported technical issues with equipment.',
-    'meter or equipment stolen': 'Customer reported stolen meter or equipment - urgent security concern.',
-    'subscription inquiry': 'Customer asked about subscription plans.',
-    'general information request': 'Customer requested general information about services.'
-  }[category.category] || `Customer called regarding: ${category.category}`;
+  console.log('📝 [Summary] Analyzing transcription to generate summary...');
   
-  const emotionText = emotion.emotion !== 'neutral' 
-    ? `Primary emotion detected: ${emotion.emotion} (${emotion.confidence}% confidence).`
-    : '';
+  // Detect the main issue/topic from transcription content
+  let mainIssue = '';
+  let resolution = '';
   
-  return `${categoryText} ${sentimentText} ${emotionText}`.trim();
+  // Issue detection based on keywords in transcription
+  if (cleanText.includes('stolen') || cleanText.includes('theft') || cleanText.includes('chori')) {
+    mainIssue = 'Customer reported meter/equipment theft';
+    resolution = 'Security team notified and replacement process initiated';
+  } else if (cleanText.includes('less range') || cleanText.includes('kam range') || cleanText.includes('battery range') || cleanText.match(/\b(10|15|20|25)\s*km\b/)) {
+    mainIssue = 'Customer complained about less battery range than expected';
+    resolution = 'Battery performance issue noted for follow-up';
+  } else if (cleanText.includes('penalty') || cleanText.includes('fine') || cleanText.includes('extra charge')) {
+    mainIssue = 'Customer inquired about penalty charges';
+    resolution = 'Penalty details explained to customer';
+  } else if (cleanText.includes('swap') && (cleanText.includes('issue') || cleanText.includes('problem') || cleanText.includes('not working'))) {
+    mainIssue = 'Customer faced issue with battery swap process';
+    resolution = 'Swap station issue reported for resolution';
+  } else if (cleanText.includes('swap') && (cleanText.includes('information') || cleanText.includes('how') || cleanText.includes('where') || cleanText.includes('station'))) {
+    mainIssue = 'Customer inquired about battery swap process';
+    resolution = 'Swap station information provided';
+  } else if (cleanText.includes('payment') || cleanText.includes('billing') || cleanText.includes('invoice') || cleanText.includes('paisa')) {
+    mainIssue = 'Customer had payment/billing related query';
+    resolution = 'Payment details clarified';
+  } else if (cleanText.includes('subscription') || cleanText.includes('plan') || cleanText.includes('unlimited')) {
+    mainIssue = 'Customer inquired about subscription plans';
+    resolution = 'Subscription options explained';
+  } else if (cleanText.includes('not working') || cleanText.includes('fault') || cleanText.includes('broken') || cleanText.includes('kharab')) {
+    mainIssue = 'Customer reported technical issue with equipment';
+    resolution = 'Technical support escalation initiated';
+  } else if (category.category && category.category !== 'general inquiry') {
+    mainIssue = `Customer called regarding ${category.category}`;
+    resolution = 'Query addressed by agent';
+  } else {
+    mainIssue = 'Customer contacted support for general inquiry';
+    resolution = 'Query handled as per standard procedure';
+  }
+  
+  // Build summary based on sentiment and emotion
+  let sentimentContext = '';
+  if (sentiment.label === 'negative') {
+    sentimentContext = 'Customer expressed concern during the call.';
+  } else if (sentiment.label === 'positive') {
+    sentimentContext = 'Customer was satisfied with the assistance.';
+  } else {
+    sentimentContext = 'Call handled professionally.';
+  }
+  
+  // Construct final summary
+  const finalSummary = `${mainIssue}. ${resolution}. ${sentimentContext}`;
+  
+  console.log('📝 [Summary] Generated summary:', finalSummary);
+  
+  return finalSummary;
 };
 
 // ============================================
 // MAIN ANALYSIS FUNCTION
 // ============================================
 export const analyzeCallWithDistilBERT = async (transcription, options = {}) => {
-  const text = typeof transcription === 'string' 
-    ? transcription 
-    : transcription?.segments?.map(s => s.text).join(' ') || 
-      transcription?.text || '';
+  // Store the original transcription
+  let originalText = '';
+  
+  if (typeof transcription === 'string') {
+    originalText = transcription;
+  } else if (transcription?.segments && Array.isArray(transcription.segments)) {
+    // Extract text from all segments
+    originalText = transcription.segments.map(s => {
+      const speaker = s.speaker || 'Speaker';
+      const text = s.text || '';
+      return `${speaker}: ${text}`;
+    }).join('\n');
+  } else if (transcription?.text) {
+    originalText = transcription.text;
+  }
+  
+  // Clean and prepare the text
+  const text = originalText.trim();
+  
+  console.log('🔮 [DistilBERT] Received transcription for analysis:');
+  console.log('📝 Text length:', text.length, 'characters');
+  console.log('📄 First 300 chars:', text.substring(0, 300));
   
   if (!text || text.length < 10) {
+    console.warn('⚠️ [DistilBERT] Insufficient text for analysis');
     return {
       success: false,
       error: 'Insufficient text for analysis',
       sentiment: { label: 'neutral', confidence: 50, isDefault: true },
       category: { category: 'general inquiry', confidence: 50, isDefault: true },
       emotion: { emotion: 'neutral', confidence: 50, isDefault: true },
-      summary: { summary: 'No transcription available for analysis.' }
+      summary: { summary: 'No transcription available for analysis.', model: 'none' },
+      originalTranscription: text
     };
   }
   
@@ -429,7 +485,8 @@ export const analyzeCallWithDistilBERT = async (transcription, options = {}) => 
       detectEmotion(text)
     ]);
     
-    // Generate smart summary
+    // Generate summary from the ACTUAL transcription
+    console.log('📝 [DistilBERT] Generating summary from transcription...');
     const summaryText = generateSmartSummary(text, sentimentResult, categoryResult, emotionResult);
     
     // Determine if we used real API or fallback
@@ -439,7 +496,8 @@ export const analyzeCallWithDistilBERT = async (transcription, options = {}) => 
       sentiment: sentimentResult.label,
       category: categoryResult.category,
       emotion: emotionResult.emotion,
-      usedAPI
+      usedAPI,
+      summaryLength: summaryText.length
     });
     
     return {
@@ -451,12 +509,14 @@ export const analyzeCallWithDistilBERT = async (transcription, options = {}) => 
       provider: usedAPI ? 'Hugging Face Inference API' : 'Intelligent Fallback (Keyword Analysis)',
       analyzedAt: new Date().toISOString(),
       textLength: text.length,
-      usedAPI
+      usedAPI,
+      originalTranscription: text
     };
   } catch (error) {
     logError('Analysis failed:', error);
     
-    // Run fallback analysis
+    // Run fallback analysis using the ACTUAL transcription
+    console.log('🔄 [DistilBERT] Using fallback analysis with actual transcription');
     const sentimentResult = analyzeSentimentFallback(text);
     const categoryResult = classifyCallTypeFallback(text);
     const emotionResult = detectEmotionFallback(text);
@@ -472,7 +532,8 @@ export const analyzeCallWithDistilBERT = async (transcription, options = {}) => 
       analyzedAt: new Date().toISOString(),
       textLength: text.length,
       usedAPI: false,
-      error: error.message
+      error: error.message,
+      originalTranscription: text
     };
   }
 };
