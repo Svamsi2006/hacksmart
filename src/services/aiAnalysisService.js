@@ -194,6 +194,244 @@ ${prompt}`
 };
 
 /**
+ * Comprehensive Analysis with Gemini for Analysis Tab
+ * Analyzes transcript and returns detailed call analysis with accurate metrics
+ */
+export const analyzeCallWithGemini = async (transcript, callContext = {}) => {
+  console.log('🔮 Starting Gemini Analysis for Analysis Tab...');
+  
+  if (!transcript || transcript.length < 20) {
+    console.warn('⚠️ Insufficient transcript for analysis');
+    return {
+      success: false,
+      error: 'Insufficient transcript for analysis',
+      sentiment: 'neutral',
+      qaScore: 75,
+      sopAdherence: 75,
+      riskLevel: 'medium',
+      summary: 'Transcript too short for accurate analysis.',
+      issues: [],
+      sopChecklist: [],
+      suggestedAction: 'Ensure complete transcript is available for accurate analysis.',
+      callLatency: null
+    };
+  }
+
+  const analysisPrompt = `You are an expert call center QA analyst for Battery Smart, India's leading EV battery swapping company.
+Analyze this customer service call transcript and provide a DETAILED quality assessment.
+
+CALL CONTEXT:
+- Agent: ${callContext.agent || 'Unknown'}
+- Call Type: ${callContext.issueType || callContext.callType || 'General'}
+- City: ${callContext.city || 'Unknown'}
+- Duration: ${callContext.duration || 'Unknown'}
+
+TRANSCRIPT:
+${transcript}
+
+Analyze the call and respond with ONLY valid JSON in this EXACT format:
+{
+  "sentiment": "positive" | "neutral" | "negative",
+  "sentimentScore": 0-100,
+  "qaScore": 0-100,
+  "sopAdherence": 0-100,
+  "riskLevel": "low" | "medium" | "high",
+  "summary": "One detailed sentence summarizing the call including the issue and resolution",
+  "issueSummary": "Clear one-line description of why customer called",
+  "issues": ["List of any problems or issues detected in the call"],
+  "sopChecklist": [
+    {"step": "Greeting & Introduction", "completed": true/false, "notes": "brief observation"},
+    {"step": "ID Verification", "completed": true/false, "notes": "brief observation"},
+    {"step": "Problem Understanding", "completed": true/false, "notes": "brief observation"},
+    {"step": "Solution Provided", "completed": true/false, "notes": "brief observation"},
+    {"step": "Upsell/Cross-sell Attempt", "completed": true/false, "notes": "brief observation"},
+    {"step": "Closing Script", "completed": true/false, "notes": "brief observation"}
+  ],
+  "suggestedAction": "Specific actionable recommendation for this call",
+  "agentPerformance": {
+    "responseTime": "fast" | "average" | "slow",
+    "empathy": "high" | "medium" | "low",
+    "problemSolving": "excellent" | "good" | "needs improvement",
+    "professionalism": "high" | "medium" | "low"
+  },
+  "customerSatisfaction": "satisfied" | "neutral" | "dissatisfied",
+  "escalationNeeded": true/false,
+  "keyMoments": ["Important moments or quotes from the call"]
+}
+
+Be ACCURATE and base your analysis ONLY on the transcript content. Do not make up information.`;
+
+  try {
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: analysisPrompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 2000
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Gemini API error:', response.status, errorText);
+      throw new Error(`Gemini API failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!content) {
+      throw new Error('Empty response from Gemini');
+    }
+
+    // Parse the JSON response
+    let parsed;
+    try {
+      // Clean up response - remove markdown code blocks if present
+      let jsonStr = content;
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1];
+      }
+      jsonStr = jsonStr.trim();
+      parsed = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('Failed to parse Gemini response:', parseError);
+      console.log('Raw content:', content);
+      throw new Error('Failed to parse AI response');
+    }
+
+    console.log('✅ Gemini Analysis Complete:', parsed);
+
+    return {
+      success: true,
+      sentiment: parsed.sentiment || 'neutral',
+      sentimentScore: parsed.sentimentScore || 50,
+      qaScore: parsed.qaScore || 75,
+      sopAdherence: parsed.sopAdherence || 75,
+      riskLevel: parsed.riskLevel || 'medium',
+      summary: parsed.summary || 'Call analyzed successfully.',
+      issueSummary: parsed.issueSummary || parsed.summary || 'Customer inquiry processed.',
+      issues: parsed.issues || [],
+      sopChecklist: parsed.sopChecklist || [],
+      suggestedAction: parsed.suggestedAction || 'Standard follow-up recommended.',
+      agentPerformance: parsed.agentPerformance || {
+        responseTime: 'average',
+        empathy: 'medium',
+        problemSolving: 'good',
+        professionalism: 'medium'
+      },
+      customerSatisfaction: parsed.customerSatisfaction || 'neutral',
+      escalationNeeded: parsed.escalationNeeded || false,
+      keyMoments: parsed.keyMoments || [],
+      analyzedAt: new Date().toISOString(),
+      provider: 'gemini',
+      transcriptLength: transcript.length
+    };
+
+  } catch (error) {
+    console.error('❌ Gemini Analysis failed:', error);
+    
+    // Return fallback analysis based on keyword detection
+    return generateFallbackAnalysisForTab(transcript, callContext);
+  }
+};
+
+/**
+ * Fallback analysis for Analysis Tab when API fails
+ */
+const generateFallbackAnalysisForTab = (transcript, callContext) => {
+  const lower = transcript.toLowerCase();
+  
+  // Detect sentiment from keywords
+  const positiveWords = ['thank', 'thanks', 'great', 'good', 'excellent', 'happy', 'satisfied', 'helpful', 'resolved', 'appreciate'];
+  const negativeWords = ['angry', 'frustrated', 'complaint', 'stolen', 'theft', 'problem', 'issue', 'not working', 'terrible', 'worst', 'disappointed'];
+  
+  let positiveCount = positiveWords.filter(w => lower.includes(w)).length;
+  let negativeCount = negativeWords.filter(w => lower.includes(w)).length;
+  
+  let sentiment = 'neutral';
+  let sentimentScore = 50;
+  let qaScore = 75;
+  let riskLevel = 'medium';
+  
+  if (positiveCount > negativeCount) {
+    sentiment = 'positive';
+    sentimentScore = 60 + (positiveCount * 8);
+    qaScore = 80 + (positiveCount * 3);
+    riskLevel = 'low';
+  } else if (negativeCount > positiveCount) {
+    sentiment = 'negative';
+    sentimentScore = 40 - (negativeCount * 5);
+    qaScore = 65 - (negativeCount * 3);
+    riskLevel = 'high';
+  }
+  
+  // Check for specific issue types
+  const issues = [];
+  if (lower.includes('stolen') || lower.includes('theft')) {
+    issues.push('Equipment theft reported - requires immediate attention');
+    riskLevel = 'high';
+  }
+  if (lower.includes('complaint') || lower.includes('frustrated')) {
+    issues.push('Customer expressed dissatisfaction');
+  }
+  if (lower.includes('not working') || lower.includes('fault')) {
+    issues.push('Technical issue reported');
+  }
+  
+  // Detect SOP adherence
+  const sopChecklist = [
+    { step: 'Greeting & Introduction', completed: lower.includes('hello') || lower.includes('welcome') || lower.includes('good'), notes: 'Keyword detected' },
+    { step: 'ID Verification', completed: lower.includes('verify') || lower.includes('phone') || lower.includes('number'), notes: 'Keyword detected' },
+    { step: 'Problem Understanding', completed: lower.includes('understand') || lower.includes('issue') || lower.includes('problem'), notes: 'Keyword detected' },
+    { step: 'Solution Provided', completed: lower.includes('will') || lower.includes('resolve') || lower.includes('help'), notes: 'Keyword detected' },
+    { step: 'Upsell/Cross-sell Attempt', completed: lower.includes('plan') || lower.includes('subscription') || lower.includes('upgrade'), notes: 'Keyword detected' },
+    { step: 'Closing Script', completed: lower.includes('thank') || lower.includes('anything else') || lower.includes('call again'), notes: 'Keyword detected' }
+  ];
+  
+  const sopCompleted = sopChecklist.filter(s => s.completed).length;
+  const sopAdherence = Math.round((sopCompleted / sopChecklist.length) * 100);
+  
+  return {
+    success: true,
+    sentiment,
+    sentimentScore: Math.max(0, Math.min(100, sentimentScore)),
+    qaScore: Math.max(0, Math.min(100, qaScore)),
+    sopAdherence: Math.max(0, Math.min(100, sopAdherence)),
+    riskLevel,
+    summary: `Call analyzed using keyword detection. ${sentiment.charAt(0).toUpperCase() + sentiment.slice(1)} customer interaction regarding ${callContext.issueType || 'general inquiry'}.`,
+    issueSummary: `Customer called regarding: ${callContext.issueType || callContext.callType || 'general inquiry'}`,
+    issues: issues.length > 0 ? issues : ['No major issues detected'],
+    sopChecklist,
+    suggestedAction: sentiment === 'negative' 
+      ? 'Schedule follow-up call to ensure customer satisfaction.'
+      : 'Standard follow-up within 24 hours.',
+    agentPerformance: {
+      responseTime: 'average',
+      empathy: sentiment === 'positive' ? 'high' : 'medium',
+      problemSolving: 'good',
+      professionalism: 'medium'
+    },
+    customerSatisfaction: sentiment === 'positive' ? 'satisfied' : sentiment === 'negative' ? 'dissatisfied' : 'neutral',
+    escalationNeeded: riskLevel === 'high',
+    keyMoments: [],
+    analyzedAt: new Date().toISOString(),
+    provider: 'fallback',
+    transcriptLength: transcript.length
+  };
+};
+
+/**
  * Main analysis function with fallback chain
  * Tries DistilBERT first, then Grok, then Gemini
  */

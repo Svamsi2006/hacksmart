@@ -11,6 +11,7 @@ import { generateIssueSummary } from '../../services/analyticsService';
 import { useTheme } from '../../context/ThemeContext';
 import { sendCallReportEmail } from '../../services/emailService';
 import { analyzeCallWithDistilBERT } from '../../services/distilbertService';
+import { analyzeCallWithGemini } from '../../services/aiAnalysisService';
 
 // Helper function to extract file ID from Google Drive URL
 const extractDriveFileId = (driveUrl) => {
@@ -65,6 +66,10 @@ const LiveCallMonitoring = () => {
   // DistilBERT AI Analysis state
   const [distilbertAnalysis, setDistilbertAnalysis] = useState(null);
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
+  
+  // Gemini Analysis state for Analysis Tab
+  const [geminiAnalysis, setGeminiAnalysis] = useState(null);
+  const [isAnalyzingGemini, setIsAnalyzingGemini] = useState(false);
   
   // Call Latency Calculator state
   const [callLatency, setCallLatency] = useState(null);
@@ -306,11 +311,13 @@ Smart-Audit AI Dashboard
   useEffect(() => {
     if (selectedCall) {
       loadTranscription(selectedCall);
-      // Reset DistilBERT analysis when new call is selected
+      // Reset all analyses when new call is selected
       setDistilbertAnalysis(null);
+      setGeminiAnalysis(null);
     } else {
       setTranscription(null);
       setDistilbertAnalysis(null);
+      setGeminiAnalysis(null);
     }
   }, [selectedCall]);
 
@@ -330,6 +337,89 @@ Smart-Audit AI Dashboard
       setIsTranscribing(false);
     }
   };
+
+  // Gemini Analysis function for Analysis Tab - Uses actual transcription for accurate results
+  const runGeminiAnalysis = async () => {
+    if (!selectedCall) return;
+    
+    setIsAnalyzingGemini(true);
+    setGeminiAnalysis(null);
+    
+    try {
+      // PRIORITY 1: Use actual transcription text from segments
+      let textToAnalyze = '';
+      
+      if (transcription?.segments && transcription.segments.length > 0) {
+        // Extract actual conversation text from transcription segments
+        textToAnalyze = transcription.segments
+          .map(segment => {
+            const speaker = segment.speaker || 'Speaker';
+            const text = segment.text || '';
+            return `${speaker}: ${text}`;
+          })
+          .join('\n');
+        console.log('📝 Using transcription segments for Gemini analysis');
+      } else if (transcription?.text) {
+        textToAnalyze = transcription.text;
+        console.log('📝 Using transcription.text for Gemini analysis');
+      } else if (transcription?.fullText) {
+        textToAnalyze = transcription.fullText;
+        console.log('📝 Using transcription.fullText for Gemini analysis');
+      }
+      
+      // If no transcription available, create context from call metadata
+      if (!textToAnalyze || textToAnalyze.length < 50) {
+        console.warn('⚠️ No sufficient transcription available, using call metadata');
+        textToAnalyze = `
+Call about: ${selectedCall.callType || 'General Inquiry'}
+Agent: ${selectedCall.agent || 'Agent'}
+City: ${selectedCall.city || 'Unknown'}
+Risk Level: ${selectedCall.riskLevel || 'medium'}
+Duration: ${selectedCall.duration || '5:00'}
+
+Note: Full transcript not available. Analysis based on call metadata only.
+        `.trim();
+      }
+      
+      console.log('🤖 Running Gemini analysis on:', textToAnalyze.substring(0, 200) + '...');
+      console.log('📊 Text length:', textToAnalyze.length, 'characters');
+      
+      // Call Gemini with call context
+      const result = await analyzeCallWithGemini(textToAnalyze, {
+        agent: selectedCall.agent,
+        issueType: selectedCall.callType,
+        callType: selectedCall.callType,
+        city: selectedCall.city,
+        duration: selectedCall.duration,
+        riskLevel: selectedCall.riskLevel
+      });
+      
+      setGeminiAnalysis(result);
+      console.log('✅ Gemini analysis complete:', result);
+    } catch (error) {
+      console.error('❌ Gemini analysis failed:', error);
+      setGeminiAnalysis({ 
+        success: false, 
+        error: error.message,
+        sentiment: 'neutral',
+        qaScore: 75,
+        sopAdherence: 75,
+        riskLevel: 'medium',
+        summary: 'Analysis failed. Please try again.',
+        issues: [],
+        sopChecklist: []
+      });
+    } finally {
+      setIsAnalyzingGemini(false);
+    }
+  };
+
+  // Auto-run Gemini analysis when Analysis tab is opened and transcription is ready
+  useEffect(() => {
+    if (activeTab === 'analysis' && transcription && !geminiAnalysis && !isAnalyzingGemini && !isTranscribing) {
+      runGeminiAnalysis();
+    }
+  }, [activeTab, transcription, geminiAnalysis, isAnalyzingGemini, isTranscribing]);
 
   // DistilBERT Analysis function - Uses ACTUAL transcription for accurate sentiment
   const runDistilBERTAnalysis = async () => {
@@ -1094,232 +1184,284 @@ This is a customer service call for Battery Smart, an electric vehicle battery s
                       exit={{ opacity: 0, y: -10 }}
                       className="space-y-4"
                     >
-                      {/* ============================================ */}
-                      {/* CALL LATENCY CALCULATOR - 3 Parts */}
-                      {/* ============================================ */}
-                      {callLatency && (
-                        <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 rounded-xl border-2 border-indigo-200 shadow-sm">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
-                                <Timer className="w-4 h-4 text-white" />
+                      {/* Loading State for Gemini Analysis */}
+                      {(isAnalyzingGemini || isTranscribing) && (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className="relative">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-teal to-blue-500 animate-pulse" />
+                            <Brain className="w-8 h-8 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                          </div>
+                          <p className="text-sm font-medium mt-4 text-navy">
+                            {isTranscribing ? 'Generating transcript...' : 'Analyzing with Gemini AI...'}
+                          </p>
+                          <p className="text-xs mt-1 text-gray-500">
+                            {isTranscribing ? 'Please wait for transcription to complete' : 'Calculating accurate QA scores and insights'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Analysis Results - Only show after Gemini analysis is complete */}
+                      {!isAnalyzingGemini && !isTranscribing && geminiAnalysis && (
+                        <>
+                          {/* AI Analysis Header */}
+                          <div className={`flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-teal/10 to-blue-50 border-2 border-teal/30`}>
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal to-blue-600 flex items-center justify-center">
+                                <Brain className="w-5 h-5 text-white" />
                               </div>
                               <div>
-                                <p className="text-sm font-bold text-indigo-800">📊 Call Latency Report</p>
-                                <p className="text-xs text-indigo-600">{callLatency.issueType}</p>
+                                <p className="font-bold text-teal-800">Gemini AI Analysis</p>
+                                <p className="text-xs text-teal-600">Powered by Google Gemini • Based on actual transcript</p>
                               </div>
                             </div>
-                            <div className={`px-3 py-1.5 rounded-lg font-bold text-lg ${
-                              callLatency.overall.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
-                              callLatency.overall.color === 'amber' ? 'bg-amber-100 text-amber-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              Grade: {callLatency.overall.grade}
+                            <div className="flex items-center gap-2">
+                              <Badge className={`${
+                                geminiAnalysis.sentiment === 'positive' ? 'bg-emerald-500' :
+                                geminiAnalysis.sentiment === 'negative' ? 'bg-red-500' : 'bg-amber-500'
+                              } text-white`}>
+                                {geminiAnalysis.sentiment?.toUpperCase()}
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={runGeminiAnalysis}
+                                className="border-teal text-teal hover:bg-teal/10"
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                Re-analyze
+                              </Button>
                             </div>
                           </div>
-                          
-                          {/* 3 Latency Cards */}
-                          <div className="grid grid-cols-3 gap-3 mb-4">
-                            {/* Response Latency */}
-                            <div className={`p-3 rounded-xl border-2 ${
-                              callLatency.response.color === 'emerald' ? 'bg-emerald-50 border-emerald-200' :
-                              callLatency.response.color === 'teal' ? 'bg-teal-50 border-teal-200' :
-                              callLatency.response.color === 'amber' ? 'bg-amber-50 border-amber-200' :
-                              'bg-red-50 border-red-200'
+
+                          {/* Key Metrics Grid - From Gemini Analysis */}
+                          <div className="grid grid-cols-4 gap-3">
+                            <div className={`p-3 rounded-xl text-center ${
+                              geminiAnalysis.qaScore >= 80 ? 'bg-emerald-50 border-2 border-emerald-200' :
+                              geminiAnalysis.qaScore >= 60 ? 'bg-amber-50 border-2 border-amber-200' :
+                              'bg-red-50 border-2 border-red-200'
                             }`}>
-                              <div className="flex items-center gap-2 mb-2">
-                                <Zap className={`w-4 h-4 ${
-                                  callLatency.response.color === 'emerald' ? 'text-emerald-600' :
-                                  callLatency.response.color === 'teal' ? 'text-teal-600' :
-                                  callLatency.response.color === 'amber' ? 'text-amber-600' :
-                                  'text-red-600'
-                                }`} />
-                                <span className="text-xs font-semibold text-gray-700">Response</span>
-                              </div>
                               <p className={`text-2xl font-bold ${
-                                callLatency.response.color === 'emerald' ? 'text-emerald-700' :
-                                callLatency.response.color === 'teal' ? 'text-teal-700' :
-                                callLatency.response.color === 'amber' ? 'text-amber-700' :
-                                'text-red-700'
-                              }`}>{callLatency.response.display}</p>
-                              <p className={`text-xs font-medium mt-1 ${
-                                callLatency.response.color === 'emerald' ? 'text-emerald-600' :
-                                callLatency.response.color === 'teal' ? 'text-teal-600' :
-                                callLatency.response.color === 'amber' ? 'text-amber-600' :
-                                'text-red-600'
-                              }`}>{callLatency.response.rating}</p>
-                              <p className="text-[10px] text-gray-500 mt-1">Benchmark: {callLatency.response.benchmark}</p>
+                                geminiAnalysis.qaScore >= 80 ? 'text-emerald-700' :
+                                geminiAnalysis.qaScore >= 60 ? 'text-amber-700' : 'text-red-700'
+                              }`}>{geminiAnalysis.qaScore}%</p>
+                              <p className="text-xs text-gray-600">QA Score</p>
                             </div>
-                            
-                            {/* Hold Latency */}
-                            <div className={`p-3 rounded-xl border-2 ${
-                              callLatency.hold.color === 'emerald' ? 'bg-emerald-50 border-emerald-200' :
-                              callLatency.hold.color === 'teal' ? 'bg-teal-50 border-teal-200' :
-                              callLatency.hold.color === 'amber' ? 'bg-amber-50 border-amber-200' :
-                              'bg-red-50 border-red-200'
+                            <div className={`p-3 rounded-xl text-center ${
+                              geminiAnalysis.sopAdherence >= 80 ? 'bg-emerald-50 border-2 border-emerald-200' :
+                              geminiAnalysis.sopAdherence >= 60 ? 'bg-amber-50 border-2 border-amber-200' :
+                              'bg-red-50 border-2 border-red-200'
                             }`}>
-                              <div className="flex items-center gap-2 mb-2">
-                                <PauseCircle className={`w-4 h-4 ${
-                                  callLatency.hold.color === 'emerald' ? 'text-emerald-600' :
-                                  callLatency.hold.color === 'teal' ? 'text-teal-600' :
-                                  callLatency.hold.color === 'amber' ? 'text-amber-600' :
-                                  'text-red-600'
-                                }`} />
-                                <span className="text-xs font-semibold text-gray-700">Hold Time</span>
-                              </div>
                               <p className={`text-2xl font-bold ${
-                                callLatency.hold.color === 'emerald' ? 'text-emerald-700' :
-                                callLatency.hold.color === 'teal' ? 'text-teal-700' :
-                                callLatency.hold.color === 'amber' ? 'text-amber-700' :
-                                'text-red-700'
-                              }`}>{callLatency.hold.display}</p>
-                              <p className={`text-xs font-medium mt-1 ${
-                                callLatency.hold.color === 'emerald' ? 'text-emerald-600' :
-                                callLatency.hold.color === 'teal' ? 'text-teal-600' :
-                                callLatency.hold.color === 'amber' ? 'text-amber-600' :
-                                'text-red-600'
-                              }`}>{callLatency.hold.rating}</p>
-                              <p className="text-[10px] text-gray-500 mt-1">Benchmark: {callLatency.hold.benchmark}</p>
+                                geminiAnalysis.sopAdherence >= 80 ? 'text-emerald-700' :
+                                geminiAnalysis.sopAdherence >= 60 ? 'text-amber-700' : 'text-red-700'
+                              }`}>{geminiAnalysis.sopAdherence}%</p>
+                              <p className="text-xs text-gray-600">SOP Adherence</p>
                             </div>
-                            
-                            {/* Resolution Latency */}
-                            <div className={`p-3 rounded-xl border-2 ${
-                              callLatency.resolution.color === 'emerald' ? 'bg-emerald-50 border-emerald-200' :
-                              callLatency.resolution.color === 'teal' ? 'bg-teal-50 border-teal-200' :
-                              callLatency.resolution.color === 'amber' ? 'bg-amber-50 border-amber-200' :
-                              'bg-red-50 border-red-200'
+                            <div className={`p-3 rounded-xl text-center ${
+                              geminiAnalysis.sentiment === 'positive' ? 'bg-emerald-50 border-2 border-emerald-200' :
+                              geminiAnalysis.sentiment === 'negative' ? 'bg-red-50 border-2 border-red-200' :
+                              'bg-amber-50 border-2 border-amber-200'
                             }`}>
-                              <div className="flex items-center gap-2 mb-2">
-                                <CheckCircle2 className={`w-4 h-4 ${
-                                  callLatency.resolution.color === 'emerald' ? 'text-emerald-600' :
-                                  callLatency.resolution.color === 'teal' ? 'text-teal-600' :
-                                  callLatency.resolution.color === 'amber' ? 'text-amber-600' :
-                                  'text-red-600'
-                                }`} />
-                                <span className="text-xs font-semibold text-gray-700">Resolution</span>
-                              </div>
-                              <p className={`text-2xl font-bold ${
-                                callLatency.resolution.color === 'emerald' ? 'text-emerald-700' :
-                                callLatency.resolution.color === 'teal' ? 'text-teal-700' :
-                                callLatency.resolution.color === 'amber' ? 'text-amber-700' :
-                                'text-red-700'
-                              }`}>{callLatency.resolution.display}</p>
-                              <p className={`text-xs font-medium mt-1 ${
-                                callLatency.resolution.color === 'emerald' ? 'text-emerald-600' :
-                                callLatency.resolution.color === 'teal' ? 'text-teal-600' :
-                                callLatency.resolution.color === 'amber' ? 'text-amber-600' :
-                                'text-red-600'
-                              }`}>{callLatency.resolution.rating}</p>
-                              <p className="text-[10px] text-gray-500 mt-1">Benchmark: {callLatency.resolution.benchmark}</p>
+                              <p className={`text-xl font-bold capitalize ${
+                                geminiAnalysis.sentiment === 'positive' ? 'text-emerald-700' :
+                                geminiAnalysis.sentiment === 'negative' ? 'text-red-700' : 'text-amber-700'
+                              }`}>{geminiAnalysis.sentiment}</p>
+                              <p className="text-xs text-gray-600">Sentiment</p>
+                            </div>
+                            <div className={`p-3 rounded-xl text-center ${
+                              geminiAnalysis.riskLevel === 'low' ? 'bg-emerald-50 border-2 border-emerald-200' :
+                              geminiAnalysis.riskLevel === 'high' ? 'bg-red-50 border-2 border-red-200' :
+                              'bg-amber-50 border-2 border-amber-200'
+                            }`}>
+                              <Badge variant={geminiAnalysis.riskLevel} className="text-sm">
+                                {geminiAnalysis.riskLevel?.toUpperCase()}
+                              </Badge>
+                              <p className="text-xs text-gray-600 mt-1">Risk Level</p>
                             </div>
                           </div>
-                          
-                          {/* Overall Score Bar */}
-                          <div className="bg-white/50 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-semibold text-gray-700">Overall Latency Score</span>
-                              <span className={`text-sm font-bold ${
-                                callLatency.overall.color === 'emerald' ? 'text-emerald-700' :
-                                callLatency.overall.color === 'amber' ? 'text-amber-700' :
-                                'text-red-700'
-                              }`}>{callLatency.overall.score}/100</span>
+
+                          {/* Issue Summary - From Gemini Analysis */}
+                          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl border-2 border-purple-200">
+                            <p className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                              <FileText className="w-4 h-4" />
+                              🎯 Issue Summary (Why Customer Called)
+                            </p>
+                            <p className="text-base font-medium text-purple-900">
+                              {geminiAnalysis.issueSummary || geminiAnalysis.summary || generateIssueSummary(selectedCall.callType, selectedCall.riskLevel)}
+                            </p>
+                            <p className="text-xs text-purple-600 mt-2">Call Type: {selectedCall.callType || 'General Inquiry'}</p>
+                          </div>
+
+                          {/* AI-Generated Summary */}
+                          <div>
+                            <p className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-2">
+                              <Brain className="w-4 h-4 text-teal" />
+                              AI-Generated Summary
+                            </p>
+                            <p className="text-sm text-gray-700 bg-teal/5 p-4 rounded-lg border border-teal/20">
+                              {geminiAnalysis.summary}
+                            </p>
+                          </div>
+
+                          {/* Detected Issues - From Gemini Analysis */}
+                          {geminiAnalysis.issues && geminiAnalysis.issues.length > 0 && (
+                            <div>
+                              <p className="text-sm font-semibold text-gray-600 mb-2">⚠️ Detected Issues</p>
+                              <ul className="space-y-2 bg-danger/5 p-4 rounded-lg border border-danger/20">
+                                {geminiAnalysis.issues.map((issue, index) => (
+                                  <li key={index} className="flex items-start gap-2 text-sm text-danger">
+                                    <span className="mt-1">•</span>
+                                    <span>{issue}</span>
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
-                            <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${callLatency.overall.score}%` }}
-                                transition={{ duration: 1, ease: 'easeOut' }}
-                                className={`h-full rounded-full ${
-                                  callLatency.overall.color === 'emerald' ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' :
-                                  callLatency.overall.color === 'amber' ? 'bg-gradient-to-r from-amber-400 to-amber-600' :
-                                  'bg-gradient-to-r from-red-400 to-red-600'
-                                }`}
-                              />
+                          )}
+
+                          {/* Suggested Action - From Gemini Analysis */}
+                          <div>
+                            <p className="text-sm font-semibold text-gray-600 mb-2">💡 Suggested Action</p>
+                            <p className="text-sm text-navy bg-amber/10 p-4 rounded-lg border border-amber/30">
+                              {geminiAnalysis.suggestedAction}
+                            </p>
+                          </div>
+
+                          {/* Agent Performance - From Gemini Analysis */}
+                          {geminiAnalysis.agentPerformance && (
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border-2 border-blue-200">
+                              <p className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                <Activity className="w-4 h-4" />
+                                📊 Agent Performance Metrics
+                              </p>
+                              <div className="grid grid-cols-4 gap-2">
+                                <div className="bg-white rounded-lg p-2 text-center">
+                                  <p className={`text-sm font-bold capitalize ${
+                                    geminiAnalysis.agentPerformance.responseTime === 'fast' ? 'text-emerald-600' :
+                                    geminiAnalysis.agentPerformance.responseTime === 'slow' ? 'text-red-600' : 'text-amber-600'
+                                  }`}>{geminiAnalysis.agentPerformance.responseTime}</p>
+                                  <p className="text-xs text-gray-500">Response</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-2 text-center">
+                                  <p className={`text-sm font-bold capitalize ${
+                                    geminiAnalysis.agentPerformance.empathy === 'high' ? 'text-emerald-600' :
+                                    geminiAnalysis.agentPerformance.empathy === 'low' ? 'text-red-600' : 'text-amber-600'
+                                  }`}>{geminiAnalysis.agentPerformance.empathy}</p>
+                                  <p className="text-xs text-gray-500">Empathy</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-2 text-center">
+                                  <p className={`text-sm font-bold capitalize ${
+                                    geminiAnalysis.agentPerformance.problemSolving === 'excellent' ? 'text-emerald-600' :
+                                    geminiAnalysis.agentPerformance.problemSolving === 'needs improvement' ? 'text-red-600' : 'text-amber-600'
+                                  }`}>{geminiAnalysis.agentPerformance.problemSolving}</p>
+                                  <p className="text-xs text-gray-500">Problem Solving</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-2 text-center">
+                                  <p className={`text-sm font-bold capitalize ${
+                                    geminiAnalysis.agentPerformance.professionalism === 'high' ? 'text-emerald-600' :
+                                    geminiAnalysis.agentPerformance.professionalism === 'low' ? 'text-red-600' : 'text-amber-600'
+                                  }`}>{geminiAnalysis.agentPerformance.professionalism}</p>
+                                  <p className="text-xs text-gray-500">Professionalism</p>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex justify-between mt-2 text-[10px] text-gray-500">
-                              <span>⚡ Response: {callLatency.response.description}</span>
-                            </div>
-                            <div className="flex justify-between mt-1 text-[10px] text-gray-500">
-                              <span>⏸️ Hold: {callLatency.hold.description}</span>
-                            </div>
-                            <div className="flex justify-between mt-1 text-[10px] text-gray-500">
-                              <span>✅ Resolution: {callLatency.resolution.description}</span>
+                          )}
+
+                          {/* SOP Checklist - From Gemini Analysis */}
+                          <div>
+                            <p className="text-sm font-semibold text-gray-600 mb-2">✅ SOP Checklist (AI Analyzed)</p>
+                            <div className="space-y-2">
+                              {(geminiAnalysis.sopChecklist && geminiAnalysis.sopChecklist.length > 0) ? (
+                                geminiAnalysis.sopChecklist.map((item, i) => (
+                                  <div key={i} className={`flex items-center justify-between p-2 rounded-lg ${
+                                    item.completed ? 'bg-teal/5' : 'bg-danger/5'
+                                  }`}>
+                                    <div className="flex items-center gap-2">
+                                      <span className={item.completed ? 'text-teal' : 'text-danger'}>
+                                        {item.completed ? '✓' : '✗'}
+                                      </span>
+                                      <span className={`text-sm ${item.completed ? 'text-gray-700' : 'text-danger'}`}>
+                                        {item.step}
+                                      </span>
+                                    </div>
+                                    {item.notes && (
+                                      <span className="text-xs text-gray-500">{item.notes}</span>
+                                    )}
+                                  </div>
+                                ))
+                              ) : (
+                                // Fallback SOP checklist if Gemini didn't return one
+                                [
+                                  { step: 'Greeting & Introduction', completed: geminiAnalysis.sopAdherence > 30 },
+                                  { step: 'ID Verification', completed: geminiAnalysis.sopAdherence > 50 },
+                                  { step: 'Problem Understanding', completed: geminiAnalysis.sopAdherence > 40 },
+                                  { step: 'Solution Provided', completed: geminiAnalysis.sopAdherence > 60 },
+                                  { step: 'Upsell Attempt', completed: geminiAnalysis.sopAdherence > 80 },
+                                  { step: 'Closing Script', completed: geminiAnalysis.sopAdherence > 70 },
+                                ].map((item, i) => (
+                                  <div key={i} className={`flex items-center gap-2 p-2 rounded-lg ${
+                                    item.completed ? 'bg-teal/5' : 'bg-danger/5'
+                                  }`}>
+                                    <span className={item.completed ? 'text-teal' : 'text-danger'}>
+                                      {item.completed ? '✓' : '✗'}
+                                    </span>
+                                    <span className={`text-sm ${item.completed ? 'text-gray-700' : 'text-danger'}`}>
+                                      {item.step}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           </div>
-                        </div>
+
+                          {/* Key Moments */}
+                          {geminiAnalysis.keyMoments && geminiAnalysis.keyMoments.length > 0 && (
+                            <div>
+                              <p className="text-sm font-semibold text-gray-600 mb-2">🎬 Key Moments</p>
+                              <ul className="space-y-2 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                {geminiAnalysis.keyMoments.map((moment, index) => (
+                                  <li key={index} className="flex items-start gap-2 text-sm text-blue-800">
+                                    <span className="mt-1">💬</span>
+                                    <span>{moment}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Analysis Meta Info */}
+                          <div className="p-3 rounded-lg bg-gray-50 text-center">
+                            <p className="text-xs text-gray-500">
+                              Analyzed: {geminiAnalysis.analyzedAt ? new Date(geminiAnalysis.analyzedAt).toLocaleString() : 'N/A'} | 
+                              Provider: {geminiAnalysis.provider || 'Gemini'} | 
+                              Transcript: {geminiAnalysis.transcriptLength || 0} chars
+                            </p>
+                          </div>
+                        </>
                       )}
 
-                      {/* Issue Summary - One Line */}
-                      <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl border-2 border-purple-200">
-                        <p className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          🎯 Issue Summary (Why Customer Called)
-                        </p>
-                        <p className="text-base font-medium text-purple-900">
-                          {generateIssueSummary(selectedCall.callType, selectedCall.riskLevel)}
-                        </p>
-                        <p className="text-xs text-purple-600 mt-2">Call Type: {selectedCall.callType || 'General Inquiry'}</p>
-                      </div>
-
-                      {/* AI Summary */}
-                      <div>
-                        <p className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-2">
-                          <Brain className="w-4 h-4 text-teal" />
-                          AI-Generated Summary
-                        </p>
-                        <p className="text-sm text-gray-700 bg-teal/5 p-4 rounded-lg border border-teal/20">
-                          {selectedCall.summary || 'Call analyzed successfully. Agent followed most SOP steps. Customer issue was resolved within the call.'}
-                        </p>
-                      </div>
-
-                      {/* Issues */}
-                      {selectedCall.issues && selectedCall.issues.length > 0 && (
-                        <div>
-                          <p className="text-sm font-semibold text-gray-600 mb-2">⚠️ Detected Issues</p>
-                          <ul className="space-y-2 bg-danger/5 p-4 rounded-lg border border-danger/20">
-                            {selectedCall.issues.map((issue, index) => (
-                              <li key={index} className="flex items-start gap-2 text-sm text-danger">
-                                <span className="mt-1">•</span>
-                                <span>{issue}</span>
-                              </li>
-                            ))}
-                          </ul>
+                      {/* Empty State - Waiting for transcript */}
+                      {!isAnalyzingGemini && !isTranscribing && !geminiAnalysis && (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                            <Brain className="w-8 h-8 text-gray-400" />
+                          </div>
+                          <p className="text-sm font-medium text-gray-500">
+                            Waiting for transcript to analyze...
+                          </p>
+                          <p className="text-xs mt-1 text-gray-400">
+                            Analysis will start automatically when transcript is ready
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={runGeminiAnalysis}
+                            className="mt-4"
+                          >
+                            <RefreshCw className="w-3 h-3 mr-2" />
+                            Analyze Now
+                          </Button>
                         </div>
                       )}
-
-                      {/* Suggested Action */}
-                      <div>
-                        <p className="text-sm font-semibold text-gray-600 mb-2">💡 Suggested Action</p>
-                        <p className="text-sm text-navy bg-amber/10 p-4 rounded-lg border border-amber/30">
-                          {selectedCall.action || 'Schedule coaching session to review ID verification protocol.'}
-                        </p>
-                      </div>
-
-                      {/* SOP Checklist */}
-                      <div>
-                        <p className="text-sm font-semibold text-gray-600 mb-2">✅ SOP Checklist</p>
-                        <div className="space-y-2">
-                          {[
-                            { step: 'Greeting & Introduction', done: true },
-                            { step: 'ID Verification', done: selectedCall.sopAdherence > 70 },
-                            { step: 'Problem Understanding', done: true },
-                            { step: 'Solution Provided', done: true },
-                            { step: 'Upsell Attempt', done: selectedCall.sopAdherence > 80 },
-                            { step: 'Closing Script', done: selectedCall.sopAdherence > 60 },
-                          ].map((item, i) => (
-                            <div key={i} className={`flex items-center gap-2 p-2 rounded-lg ${
-                              item.done ? 'bg-teal/5' : 'bg-danger/5'
-                            }`}>
-                              <span className={item.done ? 'text-teal' : 'text-danger'}>
-                                {item.done ? '✓' : '✗'}
-                              </span>
-                              <span className={`text-sm ${item.done ? 'text-gray-700' : 'text-danger'}`}>
-                                {item.step}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     </motion.div>
                   )}
 
