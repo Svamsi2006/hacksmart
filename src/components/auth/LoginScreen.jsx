@@ -359,7 +359,7 @@ const LoginScreen = ({ onLogin }) => {
               className="flex items-center gap-2 mb-6 px-4 py-2 rounded-xl bg-gray-800/30"
             >
               <Scan className="w-4 h-4 text-gray-500" />
-              <span className="text-gray-500 text-sm font-mono tracking-wider">AWAITING INPUT...</span>
+              <span className="text-gray-500 text-sm font-mono tracking-wider">PIN 1111  bro..</span>
             </motion.div>
           )}
         </AnimatePresence>
